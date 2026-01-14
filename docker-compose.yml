@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smart_warehouse_db      
+    restart: unless-stopped                  
+    environment:
+      POSTGRES_USER: warehouse_admin
+      POSTGRES_PASSWORD: SP26SE040@!
+      POSTGRES_DB: smart_warehouse
+      TZ: "Asia/Ho_Chi_Minh"                
+    ports:
+      - "5432:5432"
+    volumes:
+      - warehouse_postgres_data:/var/lib/postgresql/data  
+      - ./init-scripts:/docker-entrypoint-initdb.d        
+    networks:
+      - warehouse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_admin -d smart_warehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5                    
+
+  app:
+    build: .                         
+    container_name: warehouse_api            
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development                  
+      DATABASE_URL: postgresql://warehouse_admin:SP26SE040@!@postgres:5432/smart_warehouse
+      PORT: 3000
+      JWT_SECRET: "sp26se040-jwt-secret-key-2026" 
+      JWT_EXPIRES_IN: "7d"                   
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - warehouse-network                    
+    volumes:
+      - ./src:/app/src
+      - ./server.js:/app/server.js
+      - /app/node_modules
+    # Sử dụng nodemon để tự động restart khi code thay đổi (hot reload)
+    command: npm run dev
+
+volumes:
+  warehouse_postgres_data:                   
+
+networks:
+  warehouse-network:                         
+    driver: bridge
