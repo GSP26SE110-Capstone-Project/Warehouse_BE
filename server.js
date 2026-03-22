@@ -7,6 +7,8 @@ dotenv.config();
 
 // Import database connection
 import pool from './src/config/db.js'
+import userRoutes from './src/routes/UserRoutes.js';
+import authRoutes from './src/routes/AuthRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +18,9 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Routes
+app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ 
