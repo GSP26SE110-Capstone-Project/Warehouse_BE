@@ -1,3 +1,7 @@
+/**
+ * Invoice Schema - Hóa đơn thanh toán
+ * Để tracking bill cho mỗi hợp đồng thuê kho
+ */
 export const invoiceSchema = {
   invoiceId: {
     type: 'string',
@@ -5,33 +9,41 @@ export const invoiceSchema = {
   },
   contractId: {
     type: 'string',
-    required: false,
+    required: true,
+    foreignKey: 'contract_id',
+    note: 'ref Contract.contract_id - Hợp đồng này',
   },
-  companyId: {
+  tenantId: {
     type: 'string',
     required: true,
+    foreignKey: 'tenant_id',
+    note: 'ref Tenant.tenant_id - Công ty thuê kho',
   },
-  invoiceNumber: {
+  invoiceCode: {
     type: 'string',
     required: true,
     unique: true,
+    maxLength: 50,
   },
   invoiceType: {
     type: 'enum',
-    enum: ['rental', 'transportation', 'deposit', 'other'],
+    enum: ['RENTAL', 'TRANSPORTATION', 'DEPOSIT', 'OTHER'],
     required: false,
   },
   invoiceDate: {
     type: 'date',
     required: true,
+    note: 'Ngày phát hành hóa đơn',
   },
   dueDate: {
     type: 'date',
     required: true,
+    note: 'Hạn thanh toán',
   },
   subtotal: {
     type: 'number',
     required: true,
+    note: 'Tiền hóa đơn trước thuế (VND)',
   },
   taxPercentage: {
     type: 'number',
@@ -40,23 +52,21 @@ export const invoiceSchema = {
   taxAmount: {
     type: 'number',
     required: true,
+    note: 'Tiền thuế (VND)',
   },
   totalAmount: {
     type: 'number',
     required: true,
+    note: 'Tổng tiền hóa đơn (VND)',
   },
   paidAmount: {
     type: 'number',
     default: 0,
   },
-  balanceAmount: {
-    type: 'number',
-    required: true,
-  },
   status: {
     type: 'enum',
-    enum: ['unpaid', 'partial', 'paid', 'overdue', 'cancelled'],
-    default: 'unpaid',
+    enum: ['DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED'],
+    default: 'DRAFT',
   },
   notes: {
     type: 'text',

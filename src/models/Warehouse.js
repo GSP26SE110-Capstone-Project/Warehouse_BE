@@ -6,11 +6,13 @@ export const warehouseSchema = {
   branchId: {
     type: 'string',
     required: true,
+    foreignKey: 'branch_id',
     note: 'ref Branch.branch_id - Chi nhánh quản lý kho này',
   },
   managerId: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Người quản lý kho',
   },
   warehouseCode: {

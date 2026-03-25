@@ -13,6 +13,7 @@ export const contractItemSchema = {
   contractId: {
     type: 'string',
     required: true,
+    foreignKey: 'contract_id',
     note: 'ref Contract.contract_id',
   },
   rentType: {
@@ -23,16 +24,19 @@ export const contractItemSchema = {
   warehouseId: {
     type: 'string',
     required: false,
+    foreignKey: 'warehouse_id',
     note: 'ref Warehouse.warehouse_id - Nếu rentType = ENTIRE_WAREHOUSE',
   },
   zoneId: {
     type: 'string',
     required: false,
+    foreignKey: 'zone_id',
     note: 'ref Zone.zone_id - Nếu rentType = ZONE',
   },
   slotId: {
     type: 'string',
     required: false,
+    foreignKey: 'slot_id',
     note: 'ref Slot.slot_id - Nếu rentType = SLOT',
   },
   unitPrice: {

@@ -11,6 +11,7 @@ export const slotSchema = {
   levelId: {
     type: 'string',
     required: true,
+    foreignKey: 'level_id',
     note: 'ref Level.level_id',
   },
   slotCode: {

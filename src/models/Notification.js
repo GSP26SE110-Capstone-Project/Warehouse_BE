@@ -9,6 +9,7 @@ export const notificationSchema = {
   userId: {
     type: 'string',
     required: true,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Gửi đến user nào',
   },
   type: {

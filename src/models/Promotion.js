@@ -1,3 +1,7 @@
+/**
+ * Promotion Schema - Khuyến mãi/Giảm giá
+ * Quản lý các chương trình khuyến mãi, mã discount, etc.
+ */
 export const promotionSchema = {
   promotionId: {
     type: 'string',
@@ -5,12 +9,14 @@ export const promotionSchema = {
   },
   promotionCode: {
     type: 'string',
-    required: false,
+    required: true,
     unique: true,
+    maxLength: 50,
   },
-  title: {
+  promotionName: {
     type: 'string',
     required: true,
+    maxLength: 255,
   },
   description: {
     type: 'text',
@@ -18,29 +24,35 @@ export const promotionSchema = {
   },
   discountType: {
     type: 'enum',
-    enum: ['percentage', 'fixed_amount'],
+    enum: ['PERCENTAGE', 'FIXED_AMOUNT'],
     required: true,
+    note: 'PERCENTAGE = % giảm, FIXED_AMOUNT = giảm cố định (VND)',
   },
   discountValue: {
     type: 'number',
     required: true,
+    note: 'Giá trị giảm (% hoặc VND tùy discountType)',
   },
-  appliesTo: {
+  applicableTo: {
     type: 'enum',
-    enum: ['rental', 'transportation', 'both'],
-    required: false,
+    enum: ['ENTIRE_WAREHOUSE', 'ZONE', 'SLOT', 'ALL'],
+    required: true,
+    note: 'Áp dụng cho loại nào',
   },
-  minRentalMonths: {
+  minRentalDays: {
     type: 'integer',
     required: false,
+    note: 'Tối thiểu bao nhiêu ngày mới được áp dụng',
   },
-  minZonesCount: {
-    type: 'integer',
+  minRentalValue: {
+    type: 'number',
     required: false,
+    note: 'Tối thiểu giá trị hợp đồng (VND)',
   },
-  warehouseId: {
-    type: 'string',
+  maxDiscount: {
+    type: 'number',
     required: false,
+    note: 'Giảm giá tối đa (VND) - khi discountType = PERCENTAGE',
   },
   validFrom: {
     type: 'date',
@@ -49,6 +61,15 @@ export const promotionSchema = {
   validTo: {
     type: 'date',
     required: true,
+  },
+  maxUsage: {
+    type: 'integer',
+    required: false,
+    note: 'Số lần tối đa được sử dụng (null = không giới hạn)',
+  },
+  currentUsage: {
+    type: 'integer',
+    default: 0,
   },
   isActive: {
     type: 'boolean',

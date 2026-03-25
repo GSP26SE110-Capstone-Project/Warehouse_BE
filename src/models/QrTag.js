@@ -10,11 +10,13 @@ export const qrTagSchema = {
   shipmentId: {
     type: 'string',
     required: true,
+    foreignKey: 'shipment_id',
     note: 'ref Shipment.shipment_id - Lô hàng vận chuyển này',
   },
   slotId: {
     type: 'string',
     required: false,
+    foreignKey: 'slot_id',
     note: 'ref Slot.slot_id - Slot nơi hàng được lưu trữ',
   },
   qrCode: {
@@ -41,6 +43,7 @@ export const qrTagSchema = {
   scannedInBy: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Nhân viên quét mã nhập',
   },
   scannedOutAt: {
@@ -51,6 +54,7 @@ export const qrTagSchema = {
   scannedOutBy: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Nhân viên quét mã xuất',
   },
   createdAt: {

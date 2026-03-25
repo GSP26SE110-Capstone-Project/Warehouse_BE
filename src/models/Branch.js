@@ -10,6 +10,7 @@ export const branchSchema = {
   managerId: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'Người quản lý chi nhánh - ref User.user_id',
   },
   branchCode: {

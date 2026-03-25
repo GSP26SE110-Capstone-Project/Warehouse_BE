@@ -10,11 +10,13 @@ export const userSchema = {
   tenantId: {
     type: 'string',
     required: false,
+    foreignKey: 'tenant_id',
     note: 'ref Tenant.tenant_id - Null nếu là nhân viên của doanh nghiệp chủ quản (admin)',
   },
   branchId: {
     type: 'string',
     required: false,
+    foreignKey: 'branch_id',
     note: 'ref Branch.branch_id - Chi nhánh mà nhân viên này thuộc về',
   },
   username: {

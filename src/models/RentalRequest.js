@@ -11,6 +11,7 @@ export const rentalRequestSchema = {
   tenantId: {
     type: 'string',
     required: true,
+    foreignKey: 'tenant_id',
     note: 'ref Tenant.tenant_id - Công ty muốn thuê',
   },
   status: {

@@ -11,6 +11,7 @@ export const transportStationSchema = {
   providerId: {
     type: 'string',
     required: true,
+    foreignKey: 'provider_id',
     note: 'ref TransportProvider.provider_id',
   },
   stationName: {
@@ -25,6 +26,7 @@ export const transportStationSchema = {
   managerId: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Người quản lý trạm',
   },
   createdAt: {

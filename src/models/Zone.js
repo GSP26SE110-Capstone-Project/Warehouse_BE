@@ -11,6 +11,7 @@ export const zoneSchema = {
   warehouseId: {
     type: 'string',
     required: true,
+    foreignKey: 'warehouse_id',
     note: 'ref Warehouse.warehouse_id - Kho mà zone này thuộc về',
   },
   zoneCode: {

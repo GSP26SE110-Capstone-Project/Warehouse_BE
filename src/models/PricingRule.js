@@ -1,3 +1,7 @@
+/**
+ * PricingRule Schema - Quy tắc giá thuê kho
+ * Quản lý giá theo: khoảng thời gian, loại kho, kích thước, loại cho thuê
+ */
 export const pricingRuleSchema = {
   pricingRuleId: {
     type: 'string',
@@ -6,56 +10,55 @@ export const pricingRuleSchema = {
   warehouseId: {
     type: 'string',
     required: false,
+    foreignKey: 'warehouse_id',
+    note: 'ref Warehouse.warehouse_id - Kho áp dụng giá này (có thể null)',
   },
   zoneId: {
     type: 'string',
     required: false,
+    foreignKey: 'zone_id',
+    note: 'ref Zone.zone_id - Zone áp dụng (có thể null)',
   },
-  rowId: {
-    type: 'string',
-    required: false,
-  },
-  rentalType: {
+  rentType: {
     type: 'enum',
-    enum: ['individual', 'row', 'bulk'],
-    default: 'individual',
+    enum: ['ENTIRE_WAREHOUSE', 'ZONE', 'SLOT'],
+    default: 'ZONE',
+    note: 'Loại cho thuê áp dụng giá này',
   },
-  rentalDurationType: {
-    type: 'enum',
-    enum: ['monthly', 'quarterly', 'yearly', 'custom'],
+  minDays: {
+    type: 'integer',
     required: false,
+    note: 'Số ngày tối thiểu',
+  },
+  maxDays: {
+    type: 'integer',
+    required: false,
+    note: 'Số ngày tối đa (null = không giới hạn)',
+  },
+  pricePerDay: {
+    type: 'number',
+    required: false,
+    note: 'Giá mỗi ngày (VND)',
   },
   pricePerM2: {
     type: 'number',
     required: false,
+    note: 'Giá per m² (VND)',
   },
   pricePerPallet: {
     type: 'number',
     required: false,
+    note: 'Giá per pallet/slot (VND)',
   },
-  minPositions: {
-    type: 'integer',
-    required: false,
-  },
-  maxPositions: {
-    type: 'integer',
+  billingCycle: {
+    type: 'enum',
+    enum: ['DAILY', 'MONTHLY', 'QUARTERLY', 'YEARLY'],
     required: false,
   },
   bulkDiscountPct: {
     type: 'number',
     required: false,
-  },
-  minDays: {
-    type: 'integer',
-    required: false,
-  },
-  maxDays: {
-    type: 'integer',
-    required: false,
-  },
-  discountPercentage: {
-    type: 'number',
-    default: 0,
+    note: 'Chiết khấu tập hợp (%)',
   },
   isActive: {
     type: 'boolean',

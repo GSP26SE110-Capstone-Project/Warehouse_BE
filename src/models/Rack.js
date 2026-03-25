@@ -10,6 +10,7 @@ export const rackSchema = {
   zoneId: {
     type: 'string',
     required: true,
+    foreignKey: 'zone_id',
     note: 'ref Zone.zone_id',
   },
   rackCode: {

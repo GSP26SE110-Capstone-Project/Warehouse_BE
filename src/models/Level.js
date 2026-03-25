@@ -10,6 +10,7 @@ export const levelSchema = {
   rackId: {
     type: 'string',
     required: true,
+    foreignKey: 'rack_id',
     note: 'ref Rack.rack_id',
   },
   levelNumber: {

@@ -11,16 +11,19 @@ export const contractSchema = {
   requestId: {
     type: 'string',
     required: false,
+    foreignKey: 'request_id',
     note: 'ref RentalRequest.request_id - Yêu cầu thuê kho gốc',
   },
   tenantId: {
     type: 'string',
     required: true,
+    foreignKey: 'tenant_id',
     note: 'ref Tenant.tenant_id - Công ty thuê kho',
   },
   approvedBy: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Admin duyệt hợp đồng',
   },
   contractCode: {

@@ -10,6 +10,7 @@ export const shipmentSchema = {
   contractId: {
     type: 'string',
     required: true,
+    foreignKey: 'contract_id',
     note: 'ref Contract.contract_id - Hợp đồng liên quan',
   },
   shipmentType: {
@@ -21,16 +22,19 @@ export const shipmentSchema = {
   providerId: {
     type: 'string',
     required: false,
+    foreignKey: 'provider_id',
     note: 'ref TransportProvider.provider_id - Đơn vị vận chuyển',
   },
   driverId: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Tài xế vận chuyển (null nếu thuê ngoài)',
   },
   supervisorId: {
     type: 'string',
     required: false,
+    foreignKey: 'user_id',
     note: 'ref User.user_id - Quản lý kho giám sát xuất/nhập',
   },
   fromAddress: {
