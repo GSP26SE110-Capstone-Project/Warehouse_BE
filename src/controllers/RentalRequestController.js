@@ -65,19 +65,37 @@ export async function createRentalRequest(req, res) {
     const { rows: requestRows } = await client.query(requestQuery, requestValues);
 
     // Thêm zones đã chọn (nếu có)
-    if (selectedZones && selectedZones.length > 0) {
-      const zoneValues = selectedZones.map(zoneId => `('${requestId}', '${zoneId}')`).join(', ');
-      const zoneQuery = `
-        INSERT INTO ${RENTAL_REQUEST_ZONE_TABLE} (rental_request_id, zone_id)
-        VALUES ${zoneValues};
-      `;
-      await client.query(zoneQuery);
+    if (selectedZones !== undefined) {
+      if (!Array.isArray(selectedZones)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'selectedZones phải là mảng zoneId' });
+      }
+
+      const sanitizedZoneIds = selectedZones.filter(
+        (zoneId) => typeof zoneId === 'string' && zoneId.trim() !== ''
+      );
+
+      if (sanitizedZoneIds.length !== selectedZones.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'selectedZones chứa zoneId không hợp lệ' });
+      }
+
+      if (sanitizedZoneIds.length > 0) {
+        const placeholders = sanitizedZoneIds
+          .map((_, index) => `($1, $${index + 2})`)
+          .join(', ');
+        const zoneQuery = `
+          INSERT INTO ${RENTAL_REQUEST_ZONE_TABLE} (rental_request_id, zone_id)
+          VALUES ${placeholders};
+        `;
+        await client.query(zoneQuery, [requestId, ...sanitizedZoneIds]);
+      }
     }
 
     await client.query('COMMIT');
 
     const result = mapRentalRequestRow(requestRows[0]);
-    result.selectedZones = selectedZones || [];
+    result.selectedZones = Array.isArray(selectedZones) ? selectedZones : [];
 
     return res.status(201).json(result);
   } catch (error) {
@@ -285,27 +303,6 @@ export async function rejectRentalRequest(req, res) {
     return res.json(mapRentalRequestRow(rows[0]));
   } catch (error) {
     console.error('Error rejecting rental request:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
-  }
-}
-
-// GET /rental-requests/available-zones/:warehouseId - Lấy zones available
-export async function getAvailableZones(req, res) {
-  try {
-    const { warehouseId } = req.params;
-
-    const query = `
-      SELECT z.*, w.warehouse_name
-      FROM ${ZONE_TABLE} z
-      JOIN warehouses w ON z.warehouse_id = w.warehouse_id
-      WHERE z.warehouse_id = $1 AND z.is_rented = false
-      ORDER BY z.zone_code;
-    `;
-
-    const { rows } = await pool.query(query, [warehouseId]);
-    return res.json({ zones: rows });
-  } catch (error) {
-    console.error('Error getting available zones:', error);
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

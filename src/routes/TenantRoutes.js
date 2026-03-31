@@ -6,22 +6,25 @@ import {
   updateTenant,
   getTenantBranches,
 } from '../controllers/TenantController.js';
+import { requireAuth, requireRoles } from '../middlewares/AuthMiddleware.js';
 
 const router = express.Router();
 
+router.use(requireAuth);
+
 // Tạo tenant mới (đăng ký doanh nghiệp)
-router.post('/', createTenant);
+router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createTenant);
 
 // Danh sách tenants
-router.get('/', listTenants);
+router.get('/', requireRoles('admin'), listTenants);
 
 // Lấy chi tiết tenant theo id
-router.get('/:id', getTenantById);
+router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), getTenantById);
 
 // Cập nhật tenant
-router.patch('/:id', updateTenant);
+router.patch('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), updateTenant);
 
 // Lấy danh sách branches của tenant
-router.get('/:id/branches', getTenantBranches);
+router.get('/:id/branches', requireRoles('tenant', 'tenant_admin', 'admin'), getTenantBranches);
 
 export default router;
