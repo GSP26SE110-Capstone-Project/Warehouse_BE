@@ -11,6 +11,8 @@ COPY package*.json ./
 RUN npm install
 
 # Copy toàn bộ source code
+COPY src ./src
+COPY server.js ./
 COPY . .
 
 # Expose port

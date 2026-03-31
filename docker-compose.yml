@@ -29,7 +29,7 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development                  
-      DATABASE_URL: postgresql://warehouse_admin:SP26SE040@!@postgres:5432/smart_warehouse
+      DATABASE_URL: postgresql://warehouse_admin:SP26SE040%40%21@postgres:5432/smart_warehouse
       PORT: 3000
       JWT_SECRET: "sp26se040-jwt-secret-key-2026" 
       JWT_EXPIRES_IN: "7d"                   

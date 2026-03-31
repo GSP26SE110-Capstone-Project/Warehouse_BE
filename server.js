@@ -9,6 +9,9 @@ dotenv.config();
 import pool from './src/config/db.js'
 import userRoutes from './src/routes/UserRoutes.js';
 import authRoutes from './src/routes/AuthRoutes.js';
+import tenantRoutes from './src/routes/TenantRoutes.js';
+import rentalRequestRoutes from './src/routes/RentalRequestRoutes.js';
+import warehouseRoutes from './src/routes/WarehouseRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +24,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/rental-requests', rentalRequestRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ 

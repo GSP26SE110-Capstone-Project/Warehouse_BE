@@ -3,13 +3,15 @@ import pg from 'pg';
 const { Pool } = pg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // Hoặc cấu hình chi tiết:
-  // user: process.env.POSTGRES_USER,
-  // host: 'postgres', // tên service trong docker-compose
-  // database: process.env.POSTGRES_DB,
-  // password: process.env.POSTGRES_PASSWORD,
-  // port: 5432,
+  // Ưu tiên dùng cấu hình riêng biệt (cho local dev)
+  user: process.env.POSTGRES_USER,
+  host: process.env.POSTGRES_HOST || 'postgres', // Docker dùng 'postgres', local dùng 'localhost'
+  database: process.env.POSTGRES_DB,
+  password: process.env.POSTGRES_PASSWORD,
+  port: Number(process.env.POSTGRES_PORT || 5432),
+  
+  // Fallback: dùng connection string nếu có (cho Docker)
+  // connectionString: process.env.DATABASE_URL,
 });
 
 // Function để test connection với retry

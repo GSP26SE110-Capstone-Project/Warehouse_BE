@@ -2,6 +2,7 @@ import pool from '../config/db.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import bcrypt from 'bcrypt';
 import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/EmailService.js';
+import { signAccessToken } from '../services/JwtService.js';
 
 const OTP_TABLE = 'user_otps'; // Cần tạo bảng này trong DB
 
@@ -162,10 +163,11 @@ export async function login(req, res) {
     const user = mapUserRow(row);
     delete user.passwordHash;
 
-    // TODO: thêm JWT / session nếu cần
+    const accessToken = signAccessToken(user);
+
     return res.json({
       user,
-      // token: '...'
+      accessToken,
     });
   } catch (err) {
     console.error('Error in login:', err);
@@ -232,8 +234,13 @@ export async function verifyRegisterOtp(req, res) {
 
       const user = mapUserRow(userRow);
       delete user.passwordHash;
+      const accessToken = signAccessToken(user);
 
-      return res.json({ message: 'Kích hoạt tài khoản thành công', user });
+      return res.json({
+        message: 'Kích hoạt tài khoản thành công',
+        user,
+        accessToken,
+      });
     } catch (txErr) {
       await client.query('ROLLBACK');
       throw txErr;
