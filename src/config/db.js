@@ -1,18 +1,24 @@
 // Sử dụng pg (node-postgres)
+import dotenv from 'dotenv';
 import pg from 'pg';
 const { Pool } = pg;
+dotenv.config();
 
-const pool = new Pool({
-  // Ưu tiên dùng cấu hình riêng biệt (cho local dev)
-  user: process.env.POSTGRES_USER,
-  host: process.env.POSTGRES_HOST || 'postgres', // Docker dùng 'postgres', local dùng 'localhost'
-  database: process.env.POSTGRES_DB,
-  password: process.env.POSTGRES_PASSWORD,
-  port: Number(process.env.POSTGRES_PORT || 5432),
-  
-  // Fallback: dùng connection string nếu có (cho Docker)
-  // connectionString: process.env.DATABASE_URL,
-});
+const poolConfig = process.env.DATABASE_URL
+  ? {
+      // Docker compose đang truyền DATABASE_URL với host nội bộ "postgres"
+      connectionString: process.env.DATABASE_URL,
+    }
+  : {
+      // Local dev: dùng biến POSTGRES_* và mặc định host localhost
+      user: process.env.POSTGRES_USER,
+      host: process.env.POSTGRES_HOST || 'localhost',
+      database: process.env.POSTGRES_DB,
+      password: process.env.POSTGRES_PASSWORD,
+      port: Number(process.env.POSTGRES_PORT || 5432),
+    };
+
+const pool = new Pool(poolConfig);
 
 // Function để test connection với retry
 async function testConnection(retries = 5, delay = 2000) {
