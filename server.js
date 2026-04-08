@@ -12,6 +12,7 @@ import authRoutes from './src/routes/AuthRoutes.js';
 import tenantRoutes from './src/routes/TenantRoutes.js';
 import rentalRequestRoutes from './src/routes/RentalRequestRoutes.js';
 import warehouseRoutes from './src/routes/WarehouseRoutes.js';
+import zoneRoutes from './src/routes/ZoneRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/rental-requests', rentalRequestRoutes);
 app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/zones', zoneRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ 
