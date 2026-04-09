@@ -112,5 +112,4 @@ playwright-report/
 *.pem
 .cache/
 
-*.md
 
