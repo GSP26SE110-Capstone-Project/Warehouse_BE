@@ -209,3 +209,30 @@ export async function getTenantBranches(req, res) {
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }
+
+// DELETE /tenants/:id - Xóa tenant
+export async function deleteTenant(req, res) {
+  try {
+    const { id } = req.params;
+
+    const checkQuery = `SELECT 1 FROM ${TENANT_TABLE} WHERE tenant_id = $1;`;
+    const { rows: checkRows } = await pool.query(checkQuery, [id]);
+    if (checkRows.length === 0) {
+      return res.status(404).json({ message: 'Tenant không tồn tại' });
+    }
+
+    await pool.query(`DELETE FROM ${TENANT_TABLE} WHERE tenant_id = $1;`, [id]);
+    return res.json({ message: 'Đã xóa tenant' });
+  } catch (error) {
+    console.error('Error deleting tenant:', error);
+
+    // PostgreSQL foreign_key_violation
+    if (error.code === '23503') {
+      return res.status(400).json({
+        message: 'Không thể xóa tenant vì đang có dữ liệu liên quan'
+      });
+    }
+
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}

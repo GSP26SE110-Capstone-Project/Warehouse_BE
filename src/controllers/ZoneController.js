@@ -177,9 +177,7 @@ export async function updateZone(req, res) {
 
     if (fields.length === 0) {
       return res.status(400).json({ message: 'Không có field nào để cập nhật' });
-    }
-
-    values.push(id);
+    }    values.push(id);
     const query = `
       UPDATE ${ZONE_TABLE}
       SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
