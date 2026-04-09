@@ -13,6 +13,18 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+/**
+ * @swagger
+ * /api/rental-requests:
+ *   post:
+ *     tags: [RentalRequests]
+ *     summary: Create a new rental request
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Rental request created
+ */
 // Tạo rental request mới
 router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createRentalRequest);
 

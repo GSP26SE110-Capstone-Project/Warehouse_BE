@@ -12,6 +12,18 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+/**
+ * @swagger
+ * /api/tenants:
+ *   post:
+ *     tags: [Tenants]
+ *     summary: Create tenant company profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Tenant created
+ */
 // Tạo tenant mới (đăng ký doanh nghiệp)
 router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createTenant);
 
