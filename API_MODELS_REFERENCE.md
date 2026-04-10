@@ -17,7 +17,6 @@ Swagger UI: `http://localhost:3001/api-docs`
 
 ### `POST /api/auth/register`
 - **Request body**
-  - `userId: string` (required)
   - `email: string` (optional, nhưng cần `email` hoặc `phone`)
   - `phone: string` (optional, nhưng cần `email` hoặc `phone`)
   - `password: string` (required)

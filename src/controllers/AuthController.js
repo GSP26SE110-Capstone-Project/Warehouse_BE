@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/EmailService.js';
 import { signAccessToken } from '../services/JwtService.js';
 
@@ -31,13 +32,14 @@ function generateOtp(length = 6) {
 // POST /auth/register
 export async function register(req, res) {
   try {
-    const { userId, email, phone, password, fullName, role = 'tenant' } = req.body;
+    const { email, phone, password, fullName, role = 'tenant' } = req.body;
+    const userId = randomUUID();
 
     if (!email && !phone) {
       return res.status(400).json({ message: 'Email hoặc phone là bắt buộc' });
     }
-    if (!password || !fullName || !userId) {
-      return res.status(400).json({ message: 'userId, fullName và password là bắt buộc' });
+    if (!password || !fullName) {
+      return res.status(400).json({ message: 'fullName và password là bắt buộc' });
     }
 
     // Kiểm tra trùng email/phone
