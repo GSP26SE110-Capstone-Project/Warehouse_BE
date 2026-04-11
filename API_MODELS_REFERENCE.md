@@ -1,7 +1,7 @@
 # NextGen Warehouse BE - API Models Reference
 
-Base URL (local): `http://localhost:3001`  
-Swagger UI: `http://localhost:3001/api-docs`
+Base URL (local): `http://localhost:3000` (hoặc cổng `API_HOST_PORT` trong Docker)  
+Swagger UI: cùng host + `/api-docs`
 
 ## Quy ước kiểu dữ liệu
 
@@ -16,39 +16,61 @@ Swagger UI: `http://localhost:3001/api-docs`
 ## 1) Auth (User Authentication)
 
 ### `POST /api/auth/register`
-- **Request body**
-  - `email: string` (required, dùng để nhận OTP xác thực)
-  - `phone: string` (optional)
-  - `password: string` (required)
-  - `fullName: string` (required)
-  - `role: string` (optional, default `tenant_admin`; giá trị `tenant` được map sang `tenant_admin`)
+- **Request body** — `email`, `password`, `fullName` bắt buộc; `phone`, `role` tùy chọn (`tenant` → `tenant_admin`)
+
+```json
+{
+  "email": "user@example.com",
+  "phone": "0901234567",
+  "password": "your-secure-password",
+  "fullName": "Nguyen Van A",
+  "role": "tenant_admin"
+}
+```
+
 - **Response `201`**
   - `user: UserResponse`
   - `otp: string`
 
 ### `POST /api/auth/login`
-- **Request body**
-  - `email: string` (optional, nhưng cần `email` hoặc `phone`)
-  - `phone: string` (optional, nhưng cần `email` hoặc `phone`)
-  - `password: string` (required)
+- **Request body** — một trong `email` | `phone`, kèm `password`
+
+```json
+{
+  "email": "user@example.com",
+  hoặc "phone": "..",
+  "password": "your-secure-password"
+}
+```
+
 - **Response `200`**
   - `user: UserResponse`
   - `accessToken: string`
 
 ### `POST /api/auth/verify-register-otp`
-- **Request body**
-  - `otp: string` (required)
-  - Một trong các định danh (required, chọn một): `userId`, `email`, hoặc `phone` — server map sang `user_id` rồi kiểm tra OTP trong `user_otps`
+- **Request body** — `otp` bắt buộc; một trong `userId` | `email` | `phone`
+
+```json
+{
+  "email": "user@example.com",
+  "otp": "123456"
+}
+```
+
 - **Response `200`**
   - `message: string`
   - `user: UserResponse`
   - `accessToken: string`
 
 ### `POST /api/auth/resend-register-otp`
-- **Request body** (cần một trong: `userId`, `email`, hoặc `phone`)
-  - `email: string` (optional)
-  - `phone: string` (optional)
-  - `userId: string` (optional)
+- **Request body** — một trong `email` | `phone` | `userId`
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
 - **Điều kiện:** user tồn tại, **chưa kích hoạt** (`status` không phải `active` / `is_active` không phải `true`), không `suspended`, có **email** để gửi OTP.
 - **Hành vi:** đánh dấu hết hiệu lực mọi OTP `register` cũ (`used = true`), tạo OTP mới (hết hạn sau 10 phút), gửi email xác thực. **Cooldown 60 giây** giữa các lần gọi (HTTP `429` nếu quá sớm).
 - **Response `200`**
@@ -56,18 +78,29 @@ Swagger UI: `http://localhost:3001/api-docs`
   - `otp: string` (dev / test; production nên ẩn bớt nếu cần)
 
 ### `POST /api/auth/forgot-password`
-- **Request body**
-  - `email: string` (optional, nhưng cần `email` hoặc `phone`)
-  - `phone: string` (optional, nhưng cần `email` hoặc `phone`)
+- **Request body** — một trong `email` | `phone`
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
 - **Response `200`**
   - `message: string`
   - `otp: string` (dev mode)
 
 ### `POST /api/auth/reset-password`
-- **Request body**
-  - `userId: string` (required)
-  - `otp: string` (required)
-  - `newPassword: string` (required)
+- **Request body** — `userId`, `otp`, `newPassword`
+
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "otp": "123456",
+  "newPassword": "new-secure-password"
+}
+```
+
 - **Response `200`**
   - `message: string`
   - `user: UserResponse`
@@ -75,219 +108,238 @@ Swagger UI: `http://localhost:3001/api-docs`
 ## 2) Users (Model: `User`)
 
 ### `POST /api/users`
-- **Request body**
-  - `userId: string` (required)
-  - `email: string` (required)
-  - `passwordHash: string` (required)
-  - `fullName: string` (required)
-  - `phone: string | null` (optional)
-  - `role: string` (optional, default `tenant_admin`; giá trị `tenant` được map sang `tenant_admin`)
-  - `status: string` (optional, default `active`)
+- **Request body** — `userId`, `email`, `passwordHash`, `fullName` bắt buộc; `phone`, `role`, `status` tùy chọn
+
+```json
+{
+  "userId": "user-001",
+  "email": "user@example.com",
+  "passwordHash": "$2b$10$...",
+  "fullName": "Nguyen Van A",
+  "phone": null,
+  "role": "tenant_admin",
+  "status": "active"
+}
+```
+
 - **Response `201`**
   - `UserResponse`
 
 ### `GET /api/users`
-- **Query**
-  - `status: string` (optional)
-  - `limit: integer` (optional, default `50`)
-  - `offset: integer` (optional, default `0`)
+- **Query** — optional: `status`, `limit` (default 50), `offset` (default 0); ví dụ `?status=active&limit=20&offset=0`
 - **Response `200`**
   - `array<UserResponse>`
 
 ### `GET /api/users/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id` (user id)
 - **Response `200`**
   - `UserResponse`
 
 ### `PATCH /api/users/{id}`
-- **Path**
-  - `id: string`
-- **Request body** (ít nhất 1 field)
-  - `email?: string`
-  - `fullName?: string`
-  - `phone?: string`
-  - `role?: string`
-  - `status?: string`
-  - `passwordHash?: string`
+- **Path** — `id`
+- **Request body** — ít nhất một field
+
+```json
+{
+  "fullName": "Ten cap nhat",
+  "phone": "0909999999"
+}
+```
+
 - **Response `200`**
   - `UserResponse`
 
 ## 3) Tenants (Model: `Tenant`)
 
 ### `POST /api/tenants`
-- **Request body**
-  - `tenantId: string` (required)
-  - `companyName: string` (required)
-  - `taxCode: string` (required)
-  - `contactEmail: string` (required)
-  - `contactPhone: string` (optional)
-  - `address: string` (optional)
+- **Request body** — `tenantId`, `companyName`, `taxCode`, `contactEmail` bắt buộc; `contactPhone`, `address` tùy chọn
+
+```json
+{
+  "tenantId": "tenant-001",
+  "companyName": "Cong ty ABC",
+  "taxCode": "0123456789",
+  "contactEmail": "contact@abc.com",
+  "contactPhone": "0281234567",
+  "address": "123 Duong XYZ"
+}
+```
+
 - **Response `201`**
   - `TenantResponse`
 
 ### `GET /api/tenants`
-- **Query**
-  - `page: integer` (optional, default `1`)
-  - `limit: integer` (optional, default `10`)
-  - `search: string` (optional)
+- **Query** — optional: `page` (default 1), `limit` (default 10), `search`; ví dụ `?page=1&limit=10&search=abc`
 - **Response `200`**
   - `tenants: array<TenantResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/tenants/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id` (tenant id)
 - **Response `200`**
   - `TenantResponse`
 
 ### `PATCH /api/tenants/{id}`
-- **Path**
-  - `id: string`
-- **Request body** (dynamic fields)
-  - Ví dụ: `companyName?: string`, `taxCode?: string`, `contactEmail?: string`, `contactPhone?: string`, `address?: string`, `isActive?: boolean`
+- **Path** — `id`
+- **Request body** — các field cần cập nhật (vd. `companyName`, `taxCode`, `contactEmail`, `contactPhone`, `address`, `isActive`)
+
+```json
+{
+  "companyName": "Ten cong ty moi",
+  "isActive": true
+}
+```
+
 - **Response `200`**
   - `TenantResponse`
 
 ### `GET /api/tenants/{id}/branches`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `branches: array<object>` (raw branch row từ DB)
 
 ### `DELETE /api/tenants/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `message: string`
 
 ## 4) Warehouses (Model: `Warehouse`)
 
 ### `GET /api/warehouses`
-- **Query**
-  - `page: integer` (optional, default `1`)
-  - `limit: integer` (optional, default `10`)
-  - `city: string` (optional)
-  - `warehouseType: string` (optional)
-  - `search: string` (optional)
+- **Query** — optional: `page`, `limit`, `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM`
 - **Response `200`**
   - `warehouses: array<WarehouseResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/warehouses/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `WarehouseResponse`
 
 ### `GET /api/warehouses/{id}/zones`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `zones: array<object>` (raw joined rows)
 
 ## 5) Zones (Model: `Zone`)
 
 ### `GET /api/zones`
-- **Query**
-  - `available: boolean` (optional)
-  - `warehouseId: string` (optional)
-  - `page: integer` (optional, default `1`)
-  - `limit: integer` (optional, default `20`)
+- **Query** — optional: `available`, `warehouseId`, `page` (default 1), `limit` (default 20); ví dụ `?warehouseId=wh-001&page=1`
 - **Response `200`**
   - `zones: array<ZoneResponse>`
   - `pagination: PaginationResponse`
 
 ### `POST /api/zones`
-- **Request body**
-  - `zoneId: string` (required)
-  - `warehouseId: string` (required)
-  - `zoneCode: string` (required)
-  - `zoneName: string | null` (optional)
-  - `zoneType: string | null` (optional)
-  - `length: number` (required)
-  - `width: number` (required)
+- **Request body** — `zoneId`, `warehouseId`, `zoneCode`, `length`, `width` bắt buộc; `zoneName`, `zoneType` tùy chọn
+
+```json
+{
+  "zoneId": "zone-001",
+  "warehouseId": "wh-001",
+  "zoneCode": "A1",
+  "zoneName": "Khu A",
+  "zoneType": "normal_storage",
+  "length": 50,
+  "width": 30
+}
+```
+
 - **Response `201`**
   - `ZoneResponse`
 
 ### `GET /api/zones/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `ZoneResponse`
 
 ### `PATCH /api/zones/{id}`
-- **Path**
-  - `id: string`
-- **Request body** (ít nhất 1 field hợp lệ)
-  - `warehouseId?: string`
-  - `zoneCode?: string`
-  - `zoneName?: string`
-  - `zoneType?: string`
-  - `length?: number`
-  - `width?: number`
-  - `isRented?: boolean`
+- **Path** — `id`
+- **Request body** — ít nhất một field hợp lệ
+
+```json
+{
+  "zoneName": "Khu A (cap nhat)",
+  "isRented": false
+}
+```
+
 - **Response `200`**
   - `ZoneResponse`
 
 ### `DELETE /api/zones/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `message: string`
 
 ## 6) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
-- **Request body**
-  - `requestId: string` (required)
-  - `tenantId: string` (required)
-  - `warehouseId: string` (required)
-  - `requestedStartDate: datetime` (required)
-  - `durationDays: integer` (required, min `15`)
-  - `notes: string` (optional)
-  - `selectedZones: array<string>` (optional)
+- **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
+
+```json
+{
+  "requestId": "rr-001",
+  "tenantId": "tenant-001",
+  "warehouseId": "wh-001",
+  "requestedStartDate": "2026-05-01T00:00:00.000Z",
+  "durationDays": 30,
+  "notes": "Can bo sung zone",
+  "selectedZones": ["zone-id-1", "zone-id-2"]
+}
+```
+
 - **Response `201`**
   - `RentalRequestResponse & { selectedZones: array<string> }`
 
 ### `GET /api/rental-requests`
-- **Query**
-  - `page: integer` (optional, default `1`)
-  - `limit: integer` (optional, default `10`)
-  - `status: string` (optional)
-  - `tenantId: string` (optional)
+- **Query** — optional: `page`, `limit`, `status`, `tenantId`; ví dụ `?page=1&limit=10&status=PENDING`
 - **Response `200`**
   - `requests: array<RentalRequestResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/rental-requests/{id}`
-- **Path**
-  - `id: string`
+- **Path** — `id`
 - **Response `200`**
   - `RentalRequestResponse & { selectedZones: array<object> }`
 
 ### `PATCH /api/rental-requests/{id}`
-- **Path**
-  - `id: string`
-- **Request body** (dynamic, trừ `selectedZones`)
-  - Ví dụ: `requestedStartDate?: datetime`, `durationDays?: integer`, `notes?: string`, `warehouseId?: string`
+- **Path** — `id`
+- **Request body** — field động (không `selectedZones` trong PATCH); ví dụ `notes`, `durationDays`, `warehouseId`, `requestedStartDate`
+
+```json
+{
+  "notes": "Cap nhat ghi chu",
+  "durationDays": 45
+}
+```
+
 - **Response `200`**
   - `RentalRequestResponse`
 
 ### `POST /api/rental-requests/{id}/approve`
-- **Path**
-  - `id: string`
-- **Request body**
-  - `approvedBy: string` (required)
+- **Path** — `id`
+- **Request body** — `approvedBy`
+
+```json
+{
+  "approvedBy": "user-id-admin"
+}
+```
+
 - **Response `200`**
   - `RentalRequestResponse` (`status = APPROVED`)
 
 ### `POST /api/rental-requests/{id}/reject`
-- **Path**
-  - `id: string`
-- **Request body**
-  - `approvedBy: string` (optional theo code hiện tại)
-  - `rejectedReason: string` (optional theo code hiện tại)
+- **Path** — `id`
+- **Request body** — `approvedBy`, `rejectedReason` (tùy theo rule BE hiện tại)
+
+```json
+{
+  "approvedBy": "user-id-admin",
+  "rejectedReason": "Het cho trong ky nay"
+}
+```
+
 - **Response `200`**
   - `RentalRequestResponse` (`status = REJECTED`)
 
