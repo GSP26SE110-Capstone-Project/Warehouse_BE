@@ -1,53 +1,65 @@
+# Smart Warehouse — Docker Compose
+#
+# Cổng host API: mặc định 3000. Nếu máy bạn bị xung / lỗi với 3000, tạo trong .env:
+#   API_HOST_PORT=3005
+# rồi mở Swagger: http://localhost:3005/api-docs
+#
+# Lưu ý init DB: ./init-scripts chạy chỉ khi volume Postgres mới. File 02-schema-improvements.sql
+# ALTER bảng legacy ("User", …) — nếu init lỗi, xem logs container postgres; thường cần bỏ qua/đổi tên 02
+# hoặc chạy tay 03-complete-schema-with-fk.sql như đã làm trước đó.
+
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: smart_warehouse_db      
-    restart: unless-stopped                  
+    container_name: smart_warehouse_db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: warehouse_admin
       POSTGRES_PASSWORD: SP26SE040@!
       POSTGRES_DB: smart_warehouse
-      TZ: "Asia/Ho_Chi_Minh"                
+      TZ: "Asia/Ho_Chi_Minh"
     ports:
       - "5432:5432"
     volumes:
-      - warehouse_postgres_data:/var/lib/postgresql/data  
-      - ./init-scripts:/docker-entrypoint-initdb.d        
+      - warehouse_postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - warehouse-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U warehouse_admin -d smart_warehouse"]
       interval: 5s
       timeout: 5s
-      retries: 5                    
+      retries: 5
 
   app:
-    build: .                         
-    container_name: warehouse_api            
+    build: .
+    container_name: warehouse_api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${API_HOST_PORT:-3000}:3000"
+    env_file:
+      - .env
     environment:
-      NODE_ENV: development                  
+      NODE_ENV: development
+      # Ghi đè .env: trong container phải dùng hostname service Docker, không dùng localhost
       DATABASE_URL: postgresql://warehouse_admin:SP26SE040%40%21@postgres:5432/smart_warehouse
       PORT: 3000
-      JWT_SECRET: "sp26se040-jwt-secret-key-2026" 
-      JWT_EXPIRES_IN: "7d"                   
+      JWT_SECRET: "sp26se040-jwt-secret-key-2026"
+      JWT_EXPIRES_IN: "7d"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - warehouse-network                    
+      - warehouse-network
     volumes:
       - ./src:/app/src
       - ./server.js:/app/server.js
       - /app/node_modules
-    # Sử dụng nodemon để tự động restart khi code thay đổi (hot reload)
     command: npm run dev
 
 volumes:
-  warehouse_postgres_data:                   
+  warehouse_postgres_data:
 
 networks:
-  warehouse-network:                         
+  warehouse-network:
     driver: bridge

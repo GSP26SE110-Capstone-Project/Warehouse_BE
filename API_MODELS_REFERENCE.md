@@ -17,11 +17,11 @@ Swagger UI: `http://localhost:3001/api-docs`
 
 ### `POST /api/auth/register`
 - **Request body**
-  - `email: string` (optional, nhưng cần `email` hoặc `phone`)
-  - `phone: string` (optional, nhưng cần `email` hoặc `phone`)
+  - `email: string` (required, dùng để nhận OTP xác thực)
+  - `phone: string` (optional)
   - `password: string` (required)
   - `fullName: string` (required)
-  - `role: string` (optional, default `tenant`)
+  - `role: string` (optional, default `tenant_admin`; giá trị `tenant` được map sang `tenant_admin`)
 - **Response `201`**
   - `user: UserResponse`
   - `otp: string`
@@ -37,12 +37,23 @@ Swagger UI: `http://localhost:3001/api-docs`
 
 ### `POST /api/auth/verify-register-otp`
 - **Request body**
-  - `userId: string` (required)
   - `otp: string` (required)
+  - Một trong các định danh (required, chọn một): `userId`, `email`, hoặc `phone` — server map sang `user_id` rồi kiểm tra OTP trong `user_otps`
 - **Response `200`**
   - `message: string`
   - `user: UserResponse`
   - `accessToken: string`
+
+### `POST /api/auth/resend-register-otp`
+- **Request body** (cần một trong: `userId`, `email`, hoặc `phone`)
+  - `email: string` (optional)
+  - `phone: string` (optional)
+  - `userId: string` (optional)
+- **Điều kiện:** user tồn tại, **chưa kích hoạt** (`status` không phải `active` / `is_active` không phải `true`), không `suspended`, có **email** để gửi OTP.
+- **Hành vi:** đánh dấu hết hiệu lực mọi OTP `register` cũ (`used = true`), tạo OTP mới (hết hạn sau 10 phút), gửi email xác thực. **Cooldown 60 giây** giữa các lần gọi (HTTP `429` nếu quá sớm).
+- **Response `200`**
+  - `message: string`
+  - `otp: string` (dev / test; production nên ẩn bớt nếu cần)
 
 ### `POST /api/auth/forgot-password`
 - **Request body**
@@ -70,7 +81,7 @@ Swagger UI: `http://localhost:3001/api-docs`
   - `passwordHash: string` (required)
   - `fullName: string` (required)
   - `phone: string | null` (optional)
-  - `role: string` (optional, default `tenant`)
+  - `role: string` (optional, default `tenant_admin`; giá trị `tenant` được map sang `tenant_admin`)
   - `status: string` (optional, default `active`)
 - **Response `201`**
   - `UserResponse`

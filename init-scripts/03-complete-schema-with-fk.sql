@@ -49,6 +49,20 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (branch_id) REFERENCES branches(branch_id) ON DELETE SET NULL
 );
 
+-- OTP đăng ký / quên mật khẩu (AuthController: register, verify-register-otp, forgot-password, reset-password)
+CREATE TABLE IF NOT EXISTS user_otps (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    otp_code VARCHAR(10) NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('register', 'forgot_password')),
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_otps_user_type_created ON user_otps (user_id, type, created_at DESC);
+
 -- Thêm foreign key cho branches.manager_id sau khi users được tạo
 ALTER TABLE branches 
 ADD CONSTRAINT fk_branches_manager_id 

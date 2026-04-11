@@ -4,7 +4,7 @@ export async function sendVerificationEmail({ to, fullName, otp }) {
   if (!to) return;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.EMAIL_USER,
     to,
     subject: 'Xác thực tài khoản - Smart Warehouse',
     text: `Xin chào ${fullName || ''},\n\nMã OTP xác thực tài khoản của bạn là: ${otp}\nMã sẽ hết hạn sau 10 phút.\n\nTrân trọng,\nSmart Warehouse`,
@@ -24,7 +24,7 @@ export async function sendForgotPasswordEmail({ to, fullName, otp }) {
   if (!to) return;
 
   const mailOptions = {
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.EMAIL_USER,
     to,
     subject: 'OTP đặt lại mật khẩu - Smart Warehouse',
     text: `Xin chào ${fullName || ''},\n\nMã OTP để đặt lại mật khẩu của bạn là: ${otp}\nMã sẽ hết hạn sau 10 phút.\n\nTrân trọng,\nSmart Warehouse`,
