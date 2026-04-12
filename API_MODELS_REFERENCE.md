@@ -16,7 +16,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 1) Auth (User Authentication)
 
 ### `POST /api/auth/register`
-- **Request body** — `email`, `password`, `fullName` bắt buộc; `phone`, `role` tùy chọn (`tenant` → `tenant_admin`)
+- **Request body** — `email`, `phone`, `password`, `fullName` bắt buộc; `role` tùy chọn (`tenant` → `tenant_admin`). OTP gửi qua **email**. **Validate:** email dạng `a@b.cc`; phone **10 chữ số VN** (`0` + 9 số, vd `0901234567`) hoặc `+84`/`84` đầu số (chuẩn hóa trước khi lưu).
 
 ```json
 {
@@ -38,10 +38,11 @@ Swagger UI: cùng host + `/api-docs`
 ```json
 {
   "email": "user@example.com",
-  hoặc "phone": "..",
   "password": "your-secure-password"
 }
 ```
+
+(Hoặc dùng `phone` thay cho `email`, cùng `password`.)
 
 - **Response `200`**
   - `user: UserResponse`
