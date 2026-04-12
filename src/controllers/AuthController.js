@@ -46,6 +46,28 @@ function usableAuthString(value) {
   return s;
 }
 
+/** Email: có @, dạng local@domain.tld (TLD ≥ 2 ký tự), độ dài hợp lý. */
+function isValidEmailFormat(email) {
+  if (!email || typeof email !== 'string') return false;
+  const s = email.trim();
+  if (s.length < 5 || s.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+}
+
+/**
+ * Chuẩn hóa SĐT VN còn đúng 10 chữ số, bắt đầu bằng 0 (vd: 0901234567).
+ * Cho phép nhập kèm khoảng trắng/gạch; dạng +84 / 84 đầu số → thêm 0 phía trước 9 chữ số sau mã vùng.
+ */
+function normalizeVietnamPhone10Digits(phoneTrim) {
+  const digits = String(phoneTrim).replace(/\D/g, '');
+  if (digits.length === 10 && /^0\d{9}$/.test(digits)) return digits;
+  if (digits.length === 11 && digits.startsWith('84')) {
+    const rest = digits.slice(2);
+    if (rest.length === 9 && /^\d{9}$/.test(rest)) return `0${rest}`;
+  }
+  return null;
+}
+
 async function resolveUserIdFromAuthIdentifiers(client, uid, em, ph) {
   let resolvedUserId = uid;
   if (!resolvedUserId && em) {
@@ -56,9 +78,10 @@ async function resolveUserIdFromAuthIdentifiers(client, uid, em, ph) {
     resolvedUserId = rows[0]?.user_id;
   }
   if (!resolvedUserId && ph) {
+    const phLookup = normalizeVietnamPhone10Digits(ph) || String(ph).trim();
     const { rows } = await client.query(
       `SELECT user_id FROM ${USER_TABLE} WHERE phone = $1 LIMIT 1`,
-      [ph],
+      [phLookup],
     );
     resolvedUserId = rows[0]?.user_id;
   }
@@ -74,8 +97,24 @@ export async function register(req, res) {
     const userId = randomUUID();
     const dbRole = normalizeUserRole(role);
 
-    if (!email) {
+    const emailTrim = email != null ? String(email).trim() : '';
+    const phoneTrim = phone != null ? String(phone).trim() : '';
+
+    if (!emailTrim) {
       return res.status(400).json({ message: 'Email là bắt buộc để nhận mã OTP' });
+    }
+    if (!phoneTrim) {
+      return res.status(400).json({ message: 'Phone là bắt buộc' });
+    }
+    if (!isValidEmailFormat(emailTrim)) {
+      return res.status(400).json({ message: 'Email không hợp lệ (cần dạng có @ và tên miền, ví dụ user@example.com)' });
+    }
+    const phoneNorm = normalizeVietnamPhone10Digits(phoneTrim);
+    if (!phoneNorm) {
+      return res.status(400).json({
+        message:
+          'Số điện thoại không hợp lệ. Cần 10 chữ số Việt Nam bắt đầu bằng 0 (vd: 0901234567), hoặc +84901234567.',
+      });
     }
     if (!password || !fullName) {
       return res.status(400).json({ message: 'fullName và password là bắt buộc' });
@@ -85,10 +124,10 @@ export async function register(req, res) {
     const conflictQuery = `
       SELECT 1
       FROM ${USER_TABLE}
-      WHERE email = $1 OR phone = $2
+      WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) OR phone = $2
       LIMIT 1;
     `;
-    const { rows: conflictRows } = await pool.query(conflictQuery, [email || null, phone || null]);
+    const { rows: conflictRows } = await pool.query(conflictQuery, [emailTrim, phoneNorm]);
     if (conflictRows.length > 0) {
       return res.status(409).json({ message: 'Email hoặc phone đã tồn tại' });
     }
@@ -140,10 +179,10 @@ export async function register(req, res) {
       const insertValues = [userId];
       if (hasUsernameColumn) {
         insertColumns.push('username');
-        insertValues.push(email);
+        insertValues.push(emailTrim);
       }
       insertColumns.push('email', 'password_hash', 'full_name', 'phone', 'role');
-      insertValues.push(email, passwordHash, fullName, phone || null, dbRole);
+      insertValues.push(emailTrim, passwordHash, fullName, phoneNorm, dbRole);
       if (hasStatusColumn) {
         insertColumns.push('status');
         insertValues.push('inactive');
