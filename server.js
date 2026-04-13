@@ -16,6 +16,7 @@ import rentalRequestRoutes from './src/routes/RentalRequestRoutes.js';
 import warehouseRoutes from './src/routes/WarehouseRoutes.js';
 import zoneRoutes from './src/routes/ZoneRoutes.js';
 import contractRoutes from './src/routes/ContractRoutes.js';
+import contractItemRoutes from './src/routes/ContractItemRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.use('/api/rental-requests', rentalRequestRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/zones', zoneRoutes);
 app.use('/api/contracts', contractRoutes);
+app.use('/api/contract-items', contractItemRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {

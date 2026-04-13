@@ -394,7 +394,64 @@ Swagger UI: cùng host + `/api-docs`
   - `message: string`
   - `contract: ContractResponse`
 
-## 7) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 7) Contract Items (Model: `ContractItem`)
+
+### `POST /api/contract-items`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `itemId`, `contractId`, `rentType`, `unitPrice` bắt buộc
+- **Rule theo `rentType`**
+  - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
+  - `ZONE` -> bắt buộc `zoneId`
+  - `SLOT` -> bắt buộc `slotId`
+
+```json
+{
+  "itemId": "ci-001",
+  "contractId": "contract-001",
+  "rentType": "ZONE",
+  "zoneId": "zone-001",
+  "unitPrice": 30000000
+}
+```
+
+- **Response `201`**
+  - `ContractItemResponse`
+
+### `GET /api/contract-items`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Query** — optional: `contractId`, `rentType`, `page` (default 1), `limit` (default 20)
+- **Response `200`**
+  - `items: array<ContractItemResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Path** — `id`
+- **Response `200`**
+  - `ContractItemResponse`
+
+### `PATCH /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `itemId`, `createdAt`, `updatedAt`
+- **Rule theo `rentType`** vẫn được enforce sau khi merge dữ liệu cũ + mới
+
+```json
+{
+  "unitPrice": 32000000
+}
+```
+
+- **Response `200`**
+  - `ContractItemResponse`
+
+### `DELETE /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Response `200`**
+  - `message: string`
+
+## 8) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -570,6 +627,21 @@ Swagger UI: cùng host + `/api-docs`
   "rentalDurationDays": "integer | null",
   "totalRentalFee": "number",
   "status": "ACTIVE | EXPIRED | CANCELLED",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ContractItemResponse`
+```json
+{
+  "itemId": "string",
+  "contractId": "string",
+  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT",
+  "warehouseId": "string | null",
+  "zoneId": "string | null",
+  "slotId": "string | null",
+  "unitPrice": "number",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
