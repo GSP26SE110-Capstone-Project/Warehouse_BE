@@ -27,6 +27,122 @@ function mapWarehouseRow(row) {
   };
 }
 
+const CREATE_REQUIRED_FIELDS = [
+  'warehouseId',
+  'branchId',
+  'warehouseCode',
+  'warehouseName',
+  'warehouseType',
+  'address',
+  'length',
+  'width',
+  'height',
+];
+
+// POST /warehouses - Tạo warehouse mới
+export async function createWarehouse(req, res) {
+  try {
+    const {
+      warehouseId,
+      branchId,
+      managerId = null,
+      warehouseCode,
+      warehouseName,
+      warehouseType,
+      warehouseSize = null,
+      address,
+      city = null,
+      district = null,
+      operatingHours = null,
+      length,
+      width,
+      height,
+      totalCapacity = null,
+    } = req.body;
+
+    const requiredPayload = {
+      warehouseId,
+      branchId,
+      warehouseCode,
+      warehouseName,
+      warehouseType,
+      address,
+      length,
+      width,
+      height,
+    };
+    const missing = CREATE_REQUIRED_FIELDS.filter((field) => requiredPayload[field] === undefined || requiredPayload[field] === null || requiredPayload[field] === '');
+    if (missing.length > 0) {
+      return res.status(400).json({
+        message: `Thiếu các field bắt buộc: ${missing.join(', ')}`,
+      });
+    }
+
+    const totalArea = Number(length) * Number(width);
+    if (Number.isNaN(totalArea)) {
+      return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+    }
+
+    const conflictQuery = `
+      SELECT 1
+      FROM ${WAREHOUSE_TABLE}
+      WHERE warehouse_id = $1 OR warehouse_code = $2
+      LIMIT 1;
+    `;
+    const { rows: conflictRows } = await pool.query(conflictQuery, [warehouseId, warehouseCode]);
+    if (conflictRows.length > 0) {
+      return res.status(409).json({ message: 'warehouseId hoặc warehouseCode đã tồn tại' });
+    }
+
+    const query = `
+      INSERT INTO ${WAREHOUSE_TABLE} (
+        warehouse_id,
+        branch_id,
+        manager_id,
+        warehouse_code,
+        warehouse_name,
+        warehouse_type,
+        warehouse_size,
+        address,
+        city,
+        district,
+        operating_hours,
+        length,
+        width,
+        height,
+        total_area,
+        total_capacity,
+        is_active
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
+      RETURNING *;
+    `;
+    const values = [
+      warehouseId,
+      branchId,
+      managerId,
+      warehouseCode,
+      warehouseName,
+      warehouseType,
+      warehouseSize,
+      address,
+      city,
+      district,
+      operatingHours,
+      length,
+      width,
+      height,
+      totalArea,
+      totalCapacity,
+    ];
+    const { rows } = await pool.query(query, values);
+    return res.status(201).json(mapWarehouseRow(rows[0]));
+  } catch (error) {
+    console.error('Error creating warehouse:', error);
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}
+
 // GET /warehouses - Danh sách warehouses (public cho tenant)
 export async function listWarehouses(req, res) {
   try {
@@ -34,26 +150,30 @@ export async function listWarehouses(req, res) {
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE w.is_active = true';
-    let values = [limit, offset];
-    let paramIndex = 3;
+    const filterValues = [];
+    let filterParamIndex = 1;
 
     if (city) {
-      whereClause += ` AND w.city = $${paramIndex}`;
-      values.push(city);
-      paramIndex++;
+      whereClause += ` AND w.city = $${filterParamIndex}`;
+      filterValues.push(city);
+      filterParamIndex++;
     }
 
     if (warehouseType) {
-      whereClause += ` AND w.warehouse_type = $${paramIndex}`;
-      values.push(warehouseType);
-      paramIndex++;
+      whereClause += ` AND w.warehouse_type = $${filterParamIndex}`;
+      filterValues.push(warehouseType);
+      filterParamIndex++;
     }
 
     if (search) {
-      whereClause += ` AND (w.warehouse_name ILIKE $${paramIndex} OR w.address ILIKE $${paramIndex})`;
-      values.push(`%${search}%`);
-      paramIndex++;
+      whereClause += ` AND (w.warehouse_name ILIKE $${filterParamIndex} OR w.address ILIKE $${filterParamIndex})`;
+      filterValues.push(`%${search}%`);
+      filterParamIndex++;
     }
+
+    const values = [...filterValues, limit, offset];
+    const listLimitParam = filterParamIndex;
+    const listOffsetParam = filterParamIndex + 1;
 
     const query = `
       SELECT w.*, b.branch_name, u.full_name as manager_name
@@ -62,7 +182,7 @@ export async function listWarehouses(req, res) {
       LEFT JOIN users u ON w.manager_id = u.user_id
       ${whereClause}
       ORDER BY w.created_at DESC
-      LIMIT $1 OFFSET $2;
+      LIMIT $${listLimitParam} OFFSET $${listOffsetParam};
     `;
 
     const { rows } = await pool.query(query, values);
@@ -70,8 +190,7 @@ export async function listWarehouses(req, res) {
 
     // Đếm tổng số
     const countQuery = `SELECT COUNT(*) as total FROM ${WAREHOUSE_TABLE} w ${whereClause}`;
-    const countValues = values.slice(2);
-    const { rows: countRows } = await pool.query(countQuery, countValues);
+    const { rows: countRows } = await pool.query(countQuery, filterValues);
 
     return res.json({
       warehouses,
@@ -84,6 +203,122 @@ export async function listWarehouses(req, res) {
     });
   } catch (error) {
     console.error('Error listing warehouses:', error);
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}
+
+// PATCH /warehouses/:id - Cập nhật warehouse
+export async function updateWarehouse(req, res) {
+  try {
+    const { id } = req.params;
+    const updates = { ...req.body };
+
+    delete updates.warehouseId;
+    delete updates.createdAt;
+    delete updates.updatedAt;
+
+    const checkQuery = `SELECT * FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1;`;
+    const { rows: existingRows } = await pool.query(checkQuery, [id]);
+    if (existingRows.length === 0) {
+      return res.status(404).json({ message: 'Warehouse không tồn tại' });
+    }
+    const existing = existingRows[0];
+
+    if (updates.warehouseCode) {
+      const conflictQuery = `
+        SELECT 1
+        FROM ${WAREHOUSE_TABLE}
+        WHERE warehouse_code = $1 AND warehouse_id <> $2
+        LIMIT 1;
+      `;
+      const { rows: conflictRows } = await pool.query(conflictQuery, [updates.warehouseCode, id]);
+      if (conflictRows.length > 0) {
+        return res.status(409).json({ message: 'warehouseCode đã tồn tại' });
+      }
+    }
+
+    const allowed = [
+      'branchId',
+      'managerId',
+      'warehouseCode',
+      'warehouseName',
+      'warehouseType',
+      'warehouseSize',
+      'address',
+      'city',
+      'district',
+      'operatingHours',
+      'length',
+      'width',
+      'height',
+      'totalCapacity',
+      'isActive',
+    ];
+
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+
+    for (const key of Object.keys(updates)) {
+      if (!allowed.includes(key)) continue;
+      const dbField = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+      fields.push(`${dbField} = $${paramIndex}`);
+      values.push(updates[key]);
+      paramIndex++;
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ message: 'Không có field nào để cập nhật' });
+    }
+
+    const hasLength = Object.prototype.hasOwnProperty.call(updates, 'length');
+    const hasWidth = Object.prototype.hasOwnProperty.call(updates, 'width');
+    if (hasLength || hasWidth) {
+      const nextLength = hasLength ? Number(updates.length) : Number(existing.length);
+      const nextWidth = hasWidth ? Number(updates.width) : Number(existing.width);
+      const nextTotalArea = nextLength * nextWidth;
+      if (Number.isNaN(nextTotalArea)) {
+        return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+      }
+      fields.push(`total_area = $${paramIndex}`);
+      values.push(nextTotalArea);
+      paramIndex++;
+    }
+
+    values.push(id);
+    const query = `
+      UPDATE ${WAREHOUSE_TABLE}
+      SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE warehouse_id = $${paramIndex}
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(query, values);
+    return res.json(mapWarehouseRow(rows[0]));
+  } catch (error) {
+    console.error('Error updating warehouse:', error);
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}
+
+// DELETE /warehouses/:id - Xóa mềm warehouse
+export async function deleteWarehouse(req, res) {
+  try {
+    const { id } = req.params;
+
+    const query = `
+      UPDATE ${WAREHOUSE_TABLE}
+      SET is_active = false, updated_at = CURRENT_TIMESTAMP
+      WHERE warehouse_id = $1
+      RETURNING warehouse_id;
+    `;
+    const { rows } = await pool.query(query, [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Warehouse không tồn tại' });
+    }
+
+    return res.json({ message: 'Đã xóa warehouse' });
+  } catch (error) {
+    console.error('Error deleting warehouse:', error);
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

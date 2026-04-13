@@ -180,10 +180,39 @@ export async function updateUser(req, res) {
   }
 }
 
+// DELETE /users/:id - Deactivate account (admin)
+export async function deleteUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    const query = `
+      UPDATE ${USER_TABLE}
+      SET status = 'inactive', updated_at = NOW()
+      WHERE user_id = $1
+      RETURNING *;
+    `;
+
+    const { rows } = await pool.query(query, [id]);
+    const user = mapUserRow(rows[0]);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Account deactivated successfully',
+      user,
+    });
+  } catch (err) {
+    console.error('Error deactivating user:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 export default {
   createUser,
   getUserById,
   listUsers,
   updateUser,
+  deleteUser,
 };
 

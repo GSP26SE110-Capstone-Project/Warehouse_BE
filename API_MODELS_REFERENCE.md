@@ -150,6 +150,14 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `UserResponse`
 
+### `DELETE /api/users/{id}`
+- **Auth** — `Bearer token`, role: `admin`
+- **Path** — `id`
+- **Hành vi** — deactivate account (`status = inactive`), không xóa cứng bản ghi user
+- **Response `200`**
+  - `message: string`
+  - `user: UserResponse`
+
 ## 3) Tenants (Model: `Tenant`)
 
 ### `POST /api/tenants`
@@ -206,8 +214,35 @@ Swagger UI: cùng host + `/api-docs`
 
 ## 4) Warehouses (Model: `Warehouse`)
 
+### `POST /api/warehouses`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `warehouseId`, `branchId`, `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; các field còn lại tùy chọn
+
+```json
+{
+  "warehouseId": "wh-001",
+  "branchId": "branch-001",
+  "managerId": "user-warehouse-manager-001",
+  "warehouseCode": "WH-HCM-01",
+  "warehouseName": "Kho Thu Duc",
+  "warehouseType": "normal_storage",
+  "warehouseSize": "large",
+  "address": "123 Xa Lo Ha Noi",
+  "city": "HCM",
+  "district": "Thu Duc",
+  "operatingHours": "08:00-17:30",
+  "length": 120,
+  "width": 80,
+  "height": 12,
+  "totalCapacity": 5000
+}
+```
+
+- **Response `201`**
+  - `WarehouseResponse`
+
 ### `GET /api/warehouses`
-- **Query** — optional: `page`, `limit`, `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM&warehouseType=normal_storage`
 - **Response `200`**
   - `warehouses: array<WarehouseResponse>`
   - `pagination: PaginationResponse`
@@ -216,6 +251,31 @@ Swagger UI: cùng host + `/api-docs`
 - **Path** — `id`
 - **Response `200`**
   - `WarehouseResponse`
+
+### `PATCH /api/warehouses/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `warehouseId`, `createdAt`, `updatedAt`
+
+```json
+{
+  "warehouseName": "Kho Thu Duc (cap nhat)",
+  "managerId": "user-warehouse-manager-002",
+  "length": 140,
+  "width": 85,
+  "isActive": true
+}
+```
+
+- **Response `200`**
+  - `WarehouseResponse`
+
+### `DELETE /api/warehouses/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete (`is_active = false`)
+- **Response `200`**
+  - `message: string`
 
 ### `GET /api/warehouses/{id}/zones`
 - **Path** — `id`
@@ -272,7 +332,273 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `message: string`
 
-## 6) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 6) Contracts (Model: `Contract`)
+
+### `POST /api/contracts`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `contractId`, `tenantId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; các field còn lại tùy chọn
+
+```json
+{
+  "contractId": "contract-001",
+  "requestId": "rr-001",
+  "tenantId": "tenant-001",
+  "approvedBy": "user-admin-001",
+  "contractCode": "CTR-2026-0001",
+  "startDate": "2026-05-01",
+  "endDate": "2026-08-01",
+  "billingCycle": "MONTH",
+  "rentalDurationDays": 92,
+  "totalRentalFee": 120000000,
+  "status": "ACTIVE"
+}
+```
+
+- **Response `201`**
+  - `ContractResponse`
+
+### `GET /api/contracts`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `tenantId`, `status`, `search`; ví dụ `?page=1&limit=10&status=ACTIVE`
+- **Response `200`**
+  - `contracts: array<ContractResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Path** — `id`
+- **Response `200`**
+  - `ContractResponse`
+
+### `PATCH /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `contractId`, `createdAt`, `updatedAt`
+
+```json
+{
+  "billingCycle": "QUARTER",
+  "totalRentalFee": 125000000,
+  "status": "ACTIVE"
+}
+```
+
+- **Response `200`**
+  - `ContractResponse`
+
+### `DELETE /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete/hủy hợp đồng (`status = CANCELLED`)
+- **Response `200`**
+  - `message: string`
+  - `contract: ContractResponse`
+
+## 7) Contract Items (Model: `ContractItem`)
+
+### `POST /api/contract-items`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `itemId`, `contractId`, `rentType`, `unitPrice` bắt buộc
+- **Rule theo `rentType`**
+  - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
+  - `ZONE` -> bắt buộc `zoneId`
+  - `SLOT` -> bắt buộc `slotId`
+
+```json
+{
+  "itemId": "ci-001",
+  "contractId": "contract-001",
+  "rentType": "ZONE",
+  "zoneId": "zone-001",
+  "unitPrice": 30000000
+}
+```
+
+- **Response `201`**
+  - `ContractItemResponse`
+
+### `GET /api/contract-items`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Query** — optional: `contractId`, `rentType`, `page` (default 1), `limit` (default 20)
+- **Response `200`**
+  - `items: array<ContractItemResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Path** — `id`
+- **Response `200`**
+  - `ContractItemResponse`
+
+### `PATCH /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `itemId`, `createdAt`, `updatedAt`
+- **Rule theo `rentType`** vẫn được enforce sau khi merge dữ liệu cũ + mới
+
+```json
+{
+  "unitPrice": 32000000
+}
+```
+
+- **Response `200`**
+  - `ContractItemResponse`
+
+### `DELETE /api/contract-items/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Response `200`**
+  - `message: string`
+
+## 8) Transportation Providers (Model: `TransportationProvider`)
+
+### `POST /api/transportation-providers`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `providerId`, `name` bắt buộc; `providerType`, `contactInfo`, `isActive` tùy chọn
+
+```json
+{
+  "providerId": "tp-001",
+  "name": "Fast Logistics",
+  "providerType": "EXTERNAL",
+  "contactInfo": "hotline: 1900xxxx",
+  "isActive": true
+}
+```
+
+- **Response `201`**
+  - `TransportationProviderResponse`
+
+### `GET /api/transportation-providers`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `providerType`, `isActive`, `search`
+- **Response `200`**
+  - `providers: array<TransportationProviderResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `TransportationProviderResponse`
+
+### `PATCH /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — các field hợp lệ: `name`, `providerType`, `contactInfo`, `isActive`
+- **Response `200`**
+  - `TransportationProviderResponse`
+
+### `DELETE /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete (`is_active = false`)
+- **Response `200`**
+  - `message: string`
+  - `provider: TransportationProviderResponse`
+
+## 9) Shipments (Model: `Shipment`)
+
+### `POST /api/shipments`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Request body** — `shipmentId`, `contractId`, `shipmentType`, `fromAddress`, `toAddress` bắt buộc
+
+```json
+{
+  "shipmentId": "ship-001",
+  "contractId": "contract-001",
+  "shipmentType": "IMPORT",
+  "providerId": "tp-001",
+  "driverId": "user-driver-001",
+  "supervisorId": "user-wh-manager-001",
+  "fromAddress": "Cang Cat Lai, HCM",
+  "toAddress": "Kho Thu Duc, HCM",
+  "scheduledTime": "2026-06-01T08:00:00.000Z",
+  "totalWeight": 1800,
+  "totalDistance": 25.5,
+  "shippingFee": 3500000,
+  "status": "SCHEDULING"
+}
+```
+
+- **Response `201`**
+  - `ShipmentResponse`
+
+### `GET /api/shipments`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `contractId`, `status`, `shipmentType`, `providerId`
+- **Response `200`**
+  - `shipments: array<ShipmentResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `ShipmentResponse`
+
+### `PATCH /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Request body** — các field hợp lệ của shipment trừ `shipmentId`, `createdAt`, `updatedAt`
+- **Response `200`**
+  - `ShipmentResponse`
+
+### `DELETE /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete/hủy shipment (`status = CANCELLED`)
+- **Response `200`**
+  - `message: string`
+  - `shipment: ShipmentResponse`
+
+## 10) Transport Stations (Model: `TransportStation`)
+
+### `POST /api/transport-stations`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `stationId`, `providerId`, `stationName` bắt buộc; `address`, `managerId` tùy chọn
+
+```json
+{
+  "stationId": "ts-001",
+  "providerId": "tp-001",
+  "stationName": "Tram Cat Lai",
+  "address": "Quan 2, HCM",
+  "managerId": "user-transport-manager-001"
+}
+```
+
+- **Response `201`**
+  - `TransportStationResponse`
+
+### `GET /api/transport-stations`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `providerId`, `managerId`, `search`
+- **Response `200`**
+  - `stations: array<TransportStationResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `TransportStationResponse`
+
+### `PATCH /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — các field hợp lệ: `providerId`, `stationName`, `address`, `managerId`
+- **Response `200`**
+  - `TransportStationResponse`
+
+### `DELETE /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Response `200`**
+  - `message: string`
+
+## 11) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -384,7 +710,7 @@ Swagger UI: cùng host + `/api-docs`
   "warehouseCode": "string",
   "warehouseName": "string",
   "warehouseType": "string | null",
-  "warehouseSize": "number | null",
+  "warehouseSize": "small | medium | large | extra_large | null",
   "address": "string | null",
   "city": "string | null",
   "district": "string | null",
@@ -429,6 +755,89 @@ Swagger UI: cùng host + `/api-docs`
   "notes": "string | null",
   "approvedBy": "string | null",
   "rejectedReason": "string | null",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ContractResponse`
+```json
+{
+  "contractId": "string",
+  "requestId": "string | null",
+  "tenantId": "string",
+  "approvedBy": "string | null",
+  "contractCode": "string",
+  "startDate": "datetime",
+  "endDate": "datetime",
+  "billingCycle": "QUARTER | MONTH | YEAR | CUSTOM | null",
+  "rentalDurationDays": "integer | null",
+  "totalRentalFee": "number",
+  "status": "ACTIVE | EXPIRED | CANCELLED",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ContractItemResponse`
+```json
+{
+  "itemId": "string",
+  "contractId": "string",
+  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT",
+  "warehouseId": "string | null",
+  "zoneId": "string | null",
+  "slotId": "string | null",
+  "unitPrice": "number",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `TransportationProviderResponse`
+```json
+{
+  "providerId": "string",
+  "name": "string",
+  "providerType": "INTERNAL | EXTERNAL | null",
+  "contactInfo": "string | null",
+  "isActive": "boolean",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ShipmentResponse`
+```json
+{
+  "shipmentId": "string",
+  "contractId": "string",
+  "shipmentType": "IMPORT | EXPORT",
+  "providerId": "string | null",
+  "driverId": "string | null",
+  "supervisorId": "string | null",
+  "fromAddress": "string",
+  "toAddress": "string",
+  "scheduledTime": "datetime | null",
+  "actualStartTime": "datetime | null",
+  "actualEndTime": "datetime | null",
+  "totalWeight": "number | null",
+  "totalDistance": "number | null",
+  "shippingFee": "number | null",
+  "status": "SCHEDULING | IN_TRANSIT | DELIVERED | CANCELLED",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `TransportStationResponse`
+```json
+{
+  "stationId": "string",
+  "providerId": "string",
+  "stationName": "string",
+  "address": "string | null",
+  "managerId": "string | null",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }

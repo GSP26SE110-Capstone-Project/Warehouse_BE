@@ -15,6 +15,11 @@ import tenantRoutes from './src/routes/TenantRoutes.js';
 import rentalRequestRoutes from './src/routes/RentalRequestRoutes.js';
 import warehouseRoutes from './src/routes/WarehouseRoutes.js';
 import zoneRoutes from './src/routes/ZoneRoutes.js';
+import contractRoutes from './src/routes/ContractRoutes.js';
+import contractItemRoutes from './src/routes/ContractItemRoutes.js';
+import transportationProviderRoutes from './src/routes/TransportationProviderRoutes.js';
+import shipmentRoutes from './src/routes/ShipmentRoutes.js';
+import transportStationRoutes from './src/routes/TransportStationRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +37,11 @@ app.use('/api/tenants', tenantRoutes);
 app.use('/api/rental-requests', rentalRequestRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/zones', zoneRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/contract-items', contractItemRoutes);
+app.use('/api/transportation-providers', transportationProviderRoutes);
+app.use('/api/shipments', shipmentRoutes);
+app.use('/api/transport-stations', transportStationRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {
