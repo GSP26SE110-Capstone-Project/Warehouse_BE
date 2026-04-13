@@ -332,7 +332,69 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `message: string`
 
-## 6) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 6) Contracts (Model: `Contract`)
+
+### `POST /api/contracts`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `contractId`, `tenantId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; các field còn lại tùy chọn
+
+```json
+{
+  "contractId": "contract-001",
+  "requestId": "rr-001",
+  "tenantId": "tenant-001",
+  "approvedBy": "user-admin-001",
+  "contractCode": "CTR-2026-0001",
+  "startDate": "2026-05-01",
+  "endDate": "2026-08-01",
+  "billingCycle": "MONTH",
+  "rentalDurationDays": 92,
+  "totalRentalFee": 120000000,
+  "status": "ACTIVE"
+}
+```
+
+- **Response `201`**
+  - `ContractResponse`
+
+### `GET /api/contracts`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `tenantId`, `status`, `search`; ví dụ `?page=1&limit=10&status=ACTIVE`
+- **Response `200`**
+  - `contracts: array<ContractResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Path** — `id`
+- **Response `200`**
+  - `ContractResponse`
+
+### `PATCH /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `contractId`, `createdAt`, `updatedAt`
+
+```json
+{
+  "billingCycle": "QUARTER",
+  "totalRentalFee": 125000000,
+  "status": "ACTIVE"
+}
+```
+
+- **Response `200`**
+  - `ContractResponse`
+
+### `DELETE /api/contracts/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete/hủy hợp đồng (`status = CANCELLED`)
+- **Response `200`**
+  - `message: string`
+  - `contract: ContractResponse`
+
+## 7) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -489,6 +551,25 @@ Swagger UI: cùng host + `/api-docs`
   "notes": "string | null",
   "approvedBy": "string | null",
   "rejectedReason": "string | null",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ContractResponse`
+```json
+{
+  "contractId": "string",
+  "requestId": "string | null",
+  "tenantId": "string",
+  "approvedBy": "string | null",
+  "contractCode": "string",
+  "startDate": "datetime",
+  "endDate": "datetime",
+  "billingCycle": "QUARTER | MONTH | YEAR | CUSTOM | null",
+  "rentalDurationDays": "integer | null",
+  "totalRentalFee": "number",
+  "status": "ACTIVE | EXPIRED | CANCELLED",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
