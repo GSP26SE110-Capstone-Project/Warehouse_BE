@@ -206,8 +206,35 @@ Swagger UI: cùng host + `/api-docs`
 
 ## 4) Warehouses (Model: `Warehouse`)
 
+### `POST /api/warehouses`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `warehouseId`, `branchId`, `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; các field còn lại tùy chọn
+
+```json
+{
+  "warehouseId": "wh-001",
+  "branchId": "branch-001",
+  "managerId": "user-warehouse-manager-001",
+  "warehouseCode": "WH-HCM-01",
+  "warehouseName": "Kho Thu Duc",
+  "warehouseType": "normal_storage",
+  "warehouseSize": "large",
+  "address": "123 Xa Lo Ha Noi",
+  "city": "HCM",
+  "district": "Thu Duc",
+  "operatingHours": "08:00-17:30",
+  "length": 120,
+  "width": 80,
+  "height": 12,
+  "totalCapacity": 5000
+}
+```
+
+- **Response `201`**
+  - `WarehouseResponse`
+
 ### `GET /api/warehouses`
-- **Query** — optional: `page`, `limit`, `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM&warehouseType=normal_storage`
 - **Response `200`**
   - `warehouses: array<WarehouseResponse>`
   - `pagination: PaginationResponse`
@@ -216,6 +243,31 @@ Swagger UI: cùng host + `/api-docs`
 - **Path** — `id`
 - **Response `200`**
   - `WarehouseResponse`
+
+### `PATCH /api/warehouses/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `warehouseId`, `createdAt`, `updatedAt`
+
+```json
+{
+  "warehouseName": "Kho Thu Duc (cap nhat)",
+  "managerId": "user-warehouse-manager-002",
+  "length": 140,
+  "width": 85,
+  "isActive": true
+}
+```
+
+- **Response `200`**
+  - `WarehouseResponse`
+
+### `DELETE /api/warehouses/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete (`is_active = false`)
+- **Response `200`**
+  - `message: string`
 
 ### `GET /api/warehouses/{id}/zones`
 - **Path** — `id`
@@ -384,7 +436,7 @@ Swagger UI: cùng host + `/api-docs`
   "warehouseCode": "string",
   "warehouseName": "string",
   "warehouseType": "string | null",
-  "warehouseSize": "number | null",
+  "warehouseSize": "small | medium | large | extra_large | null",
   "address": "string | null",
   "city": "string | null",
   "district": "string | null",
