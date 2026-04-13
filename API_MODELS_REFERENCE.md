@@ -451,7 +451,109 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `message: string`
 
-## 8) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 8) Transportation Providers (Model: `TransportationProvider`)
+
+### `POST /api/transportation-providers`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `providerId`, `name` bắt buộc; `providerType`, `contactInfo`, `isActive` tùy chọn
+
+```json
+{
+  "providerId": "tp-001",
+  "name": "Fast Logistics",
+  "providerType": "EXTERNAL",
+  "contactInfo": "hotline: 1900xxxx",
+  "isActive": true
+}
+```
+
+- **Response `201`**
+  - `TransportationProviderResponse`
+
+### `GET /api/transportation-providers`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `providerType`, `isActive`, `search`
+- **Response `200`**
+  - `providers: array<TransportationProviderResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `TransportationProviderResponse`
+
+### `PATCH /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — các field hợp lệ: `name`, `providerType`, `contactInfo`, `isActive`
+- **Response `200`**
+  - `TransportationProviderResponse`
+
+### `DELETE /api/transportation-providers/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete (`is_active = false`)
+- **Response `200`**
+  - `message: string`
+  - `provider: TransportationProviderResponse`
+
+## 9) Shipments (Model: `Shipment`)
+
+### `POST /api/shipments`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Request body** — `shipmentId`, `contractId`, `shipmentType`, `fromAddress`, `toAddress` bắt buộc
+
+```json
+{
+  "shipmentId": "ship-001",
+  "contractId": "contract-001",
+  "shipmentType": "IMPORT",
+  "providerId": "tp-001",
+  "driverId": "user-driver-001",
+  "supervisorId": "user-wh-manager-001",
+  "fromAddress": "Cang Cat Lai, HCM",
+  "toAddress": "Kho Thu Duc, HCM",
+  "scheduledTime": "2026-06-01T08:00:00.000Z",
+  "totalWeight": 1800,
+  "totalDistance": 25.5,
+  "shippingFee": 3500000,
+  "status": "SCHEDULING"
+}
+```
+
+- **Response `201`**
+  - `ShipmentResponse`
+
+### `GET /api/shipments`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `contractId`, `status`, `shipmentType`, `providerId`
+- **Response `200`**
+  - `shipments: array<ShipmentResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `ShipmentResponse`
+
+### `PATCH /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Request body** — các field hợp lệ của shipment trừ `shipmentId`, `createdAt`, `updatedAt`
+- **Response `200`**
+  - `ShipmentResponse`
+
+### `DELETE /api/shipments/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete/hủy shipment (`status = CANCELLED`)
+- **Response `200`**
+  - `message: string`
+  - `shipment: ShipmentResponse`
+
+## 10) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -642,6 +744,42 @@ Swagger UI: cùng host + `/api-docs`
   "zoneId": "string | null",
   "slotId": "string | null",
   "unitPrice": "number",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `TransportationProviderResponse`
+```json
+{
+  "providerId": "string",
+  "name": "string",
+  "providerType": "INTERNAL | EXTERNAL | null",
+  "contactInfo": "string | null",
+  "isActive": "boolean",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `ShipmentResponse`
+```json
+{
+  "shipmentId": "string",
+  "contractId": "string",
+  "shipmentType": "IMPORT | EXPORT",
+  "providerId": "string | null",
+  "driverId": "string | null",
+  "supervisorId": "string | null",
+  "fromAddress": "string",
+  "toAddress": "string",
+  "scheduledTime": "datetime | null",
+  "actualStartTime": "datetime | null",
+  "actualEndTime": "datetime | null",
+  "totalWeight": "number | null",
+  "totalDistance": "number | null",
+  "shippingFee": "number | null",
+  "status": "SCHEDULING | IN_TRANSIT | DELIVERED | CANCELLED",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
