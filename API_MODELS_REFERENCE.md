@@ -553,7 +553,52 @@ Swagger UI: cùng host + `/api-docs`
   - `message: string`
   - `shipment: ShipmentResponse`
 
-## 10) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 10) Transport Stations (Model: `TransportStation`)
+
+### `POST /api/transport-stations`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Request body** — `stationId`, `providerId`, `stationName` bắt buộc; `address`, `managerId` tùy chọn
+
+```json
+{
+  "stationId": "ts-001",
+  "providerId": "tp-001",
+  "stationName": "Tram Cat Lai",
+  "address": "Quan 2, HCM",
+  "managerId": "user-transport-manager-001"
+}
+```
+
+- **Response `201`**
+  - `TransportStationResponse`
+
+### `GET /api/transport-stations`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `providerId`, `managerId`, `search`
+- **Response `200`**
+  - `stations: array<TransportStationResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `TransportStationResponse`
+
+### `PATCH /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — các field hợp lệ: `providerId`, `stationName`, `address`, `managerId`
+- **Response `200`**
+  - `TransportStationResponse`
+
+### `DELETE /api/transport-stations/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Response `200`**
+  - `message: string`
+
+## 11) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -780,6 +825,19 @@ Swagger UI: cùng host + `/api-docs`
   "totalDistance": "number | null",
   "shippingFee": "number | null",
   "status": "SCHEDULING | IN_TRANSIT | DELIVERED | CANCELLED",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `TransportStationResponse`
+```json
+{
+  "stationId": "string",
+  "providerId": "string",
+  "stationName": "string",
+  "address": "string | null",
+  "managerId": "string | null",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
