@@ -1,9 +1,11 @@
 import express from 'express';
+import { requireAuth, requireRoles } from '../middlewares/AuthMiddleware.js';
 import {
   createUser,
   getUserById,
   listUsers,
   updateUser,
+  deleteUser,
 } from '../controllers/UserController.js';
 
 const router = express.Router();
@@ -19,6 +21,9 @@ router.get('/:id', getUserById);
 
 // Cập nhật user
 router.patch('/:id', updateUser);
+
+// Vô hiệu hóa account (admin)
+router.delete('/:id', requireAuth, requireRoles('admin'), deleteUser);
 
 export default router;
 

@@ -150,6 +150,14 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `UserResponse`
 
+### `DELETE /api/users/{id}`
+- **Auth** — `Bearer token`, role: `admin`
+- **Path** — `id`
+- **Hành vi** — deactivate account (`status = inactive`), không xóa cứng bản ghi user
+- **Response `200`**
+  - `message: string`
+  - `user: UserResponse`
+
 ## 3) Tenants (Model: `Tenant`)
 
 ### `POST /api/tenants`
