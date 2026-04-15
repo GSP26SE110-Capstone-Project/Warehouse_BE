@@ -4,6 +4,7 @@ import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
 import { tableName as RENTAL_REQUEST_ZONE_TABLE } from '../models/RentalRequestZone.js';
 import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
+import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
@@ -265,21 +266,45 @@ export async function createRentalRequest(req, res) {
       }
 
       if (sanitizedZoneIds.length > 0) {
-        const placeholders = sanitizedZoneIds
+        const uniqueZoneIds = [...new Set(sanitizedZoneIds)];
+        const zonePlaceholders = uniqueZoneIds.map((_, i) => `$${i + 2}`).join(', ');
+        const { rows: existingZones } = await client.query(
+          `SELECT zone_id FROM ${ZONE_TABLE} WHERE warehouse_id = $1 AND zone_id IN (${zonePlaceholders})`,
+          [warehouseId, ...uniqueZoneIds],
+        );
+        const foundIds = new Set(existingZones.map((r) => r.zone_id));
+        const invalidZoneIds = uniqueZoneIds.filter((zid) => !foundIds.has(zid));
+        if (invalidZoneIds.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            message:
+              'Một hoặc nhiều zone không tồn tại hoặc không thuộc warehouse đã chọn (kiểm tra zone_id trong DB)',
+            invalidZoneIds,
+          });
+        }
+
+        const placeholders = uniqueZoneIds
           .map((_, index) => `($1, $${index + 2})`)
           .join(', ');
         const zoneQuery = `
           INSERT INTO ${RENTAL_REQUEST_ZONE_TABLE} (rental_request_id, zone_id)
           VALUES ${placeholders};
         `;
-        await client.query(zoneQuery, [requestId, ...sanitizedZoneIds]);
+        await client.query(zoneQuery, [requestId, ...uniqueZoneIds]);
       }
     }
 
     await client.query('COMMIT');
 
     const result = mapRentalRequestRow(requestRows[0]);
-    result.selectedZones = Array.isArray(selectedZones) ? selectedZones : [];
+    if (Array.isArray(selectedZones)) {
+      const sanitized = selectedZones.filter(
+        (zoneId) => typeof zoneId === 'string' && zoneId.trim() !== '',
+      );
+      result.selectedZones = sanitized.length ? [...new Set(sanitized)] : [];
+    } else {
+      result.selectedZones = [];
+    }
 
     return res.status(201).json(result);
   } catch (error) {
@@ -504,10 +529,10 @@ export async function approveRentalRequest(req, res) {
   const client = await pool.connect();
   try {
     const { id } = req.params;
-    const approvedBy = req.body.approvedBy || req.user?.userId;
+    const approvedBy = req.user?.userId;
 
     if (!approvedBy) {
-      return res.status(400).json({ message: 'approvedBy là bắt buộc' });
+      return res.status(400).json({ message: 'Không xác định được người duyệt; vui lòng đăng nhập lại' });
     }
 
     await client.query('BEGIN');
@@ -536,6 +561,17 @@ export async function approveRentalRequest(req, res) {
       generatedContractId = randomUUID();
       const contractCode = `CT-${Date.now()}`;
 
+      const startRaw = approvedRequest.requested_start_date;
+      const startStr =
+        startRaw instanceof Date
+          ? startRaw.toISOString().slice(0, 10)
+          : String(startRaw).slice(0, 10);
+      const durationDays = Number(approvedRequest.duration_days);
+      const startNoon = new Date(`${startStr}T12:00:00.000Z`);
+      const endNoon = new Date(startNoon);
+      endNoon.setUTCDate(endNoon.getUTCDate() + durationDays);
+      const endStr = endNoon.toISOString().slice(0, 10);
+
       await client.query(
         `
         INSERT INTO ${CONTRACT_TABLE} (
@@ -551,7 +587,7 @@ export async function approveRentalRequest(req, res) {
           total_rental_fee,
           status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $6 + (($7 || ' days')::interval), $8, $7, $9, 'DRAFT')
+        VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11)
         `,
         [
           generatedContractId,
@@ -559,12 +595,48 @@ export async function approveRentalRequest(req, res) {
           approvedRequest.tenant_id,
           approvedBy,
           contractCode,
-          approvedRequest.requested_start_date,
-          approvedRequest.duration_days,
+          startStr,
+          endStr,
           approvedRequest.rental_term_unit,
+          durationDays,
           0,
+          'ACTIVE',
         ],
       );
+
+      const { rows: zoneLinks } = await client.query(
+        `
+        SELECT rrz.zone_id, z.warehouse_id
+        FROM ${RENTAL_REQUEST_ZONE_TABLE} rrz
+        INNER JOIN ${ZONE_TABLE} z ON z.zone_id = rrz.zone_id
+        WHERE rrz.rental_request_id = $1
+        `,
+        [id],
+      );
+
+      if (zoneLinks.length > 0) {
+        for (const row of zoneLinks) {
+          await client.query(
+            `
+            INSERT INTO ${CONTRACT_ITEM_TABLE} (
+              item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
+            )
+            VALUES ($1, $2, 'ZONE', $3, $4, NULL, 0)
+            `,
+            [randomUUID(), generatedContractId, row.warehouse_id, row.zone_id],
+          );
+        }
+      } else {
+        await client.query(
+          `
+          INSERT INTO ${CONTRACT_ITEM_TABLE} (
+            item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
+          )
+          VALUES ($1, $2, 'ENTIRE_WAREHOUSE', $3, NULL, NULL, 0)
+          `,
+          [randomUUID(), generatedContractId, approvedRequest.warehouse_id],
+        );
+      }
     }
 
     const userIds = await findNotifiedUserIds(client, approvedRequest);
@@ -595,8 +667,11 @@ export async function rejectRentalRequest(req, res) {
   const client = await pool.connect();
   try {
     const { id } = req.params;
-    const approvedBy = req.body.approvedBy || req.user?.userId;
+    const approvedBy = req.user?.userId;
     const { rejectedReason } = req.body;
+    if (!approvedBy) {
+      return res.status(400).json({ message: 'Không xác định được người xử lý; vui lòng đăng nhập lại' });
+    }
     if (!rejectedReason) {
       return res.status(400).json({ message: 'rejectedReason là bắt buộc' });
     }
