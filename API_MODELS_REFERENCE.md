@@ -658,6 +658,38 @@ Swagger UI: cùng host + `/api-docs`
   - `message: string`
   - `record: ImportExportRecordResponse`
 
+### `POST /api/import-export-reports`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Mục đích** — Tạo báo cáo xuất nhập theo kỳ (tổng hợp từ `import_export_records`), trả JSON; **không** lưu bản ghi báo cáo vào database.
+- **Request body** — `from`, `to` bắt buộc (ISO datetime); các field còn lại tùy chọn
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `basis` | `scheduled` (mặc định) — lọc theo `scheduled_datetime`; `actual` — lọc theo `actual_datetime` (bỏ qua bản ghi chưa có thời điểm thực tế) |
+| `warehouseId`, `contractId`, `tenantId`, `recordType`, `status` | Lọc thêm |
+| `includeDetails` | `true`/`false` (mặc định `true`) |
+| `detailsLimit` | Số dòng chi tiết tối đa (1–2000, mặc định 200) |
+
+```json
+{
+  "from": "2026-01-01T00:00:00.000Z",
+  "to": "2026-06-30T23:59:59.999Z",
+  "basis": "scheduled",
+  "warehouseId": "wh-001",
+  "tenantId": null,
+  "includeDetails": true,
+  "detailsLimit": 200
+}
+```
+
+- **Response `201`**
+  - `reportId: string` (UUID sinh tại thời điểm gọi)
+  - `generatedAt: datetime`
+  - `period`, `filters`
+  - `summary` — `totalRecords`, `byRecordType` (IMPORT/EXPORT: count, totalQuantity, totalWeight), `byStatus`, `byWarehouse`
+  - `details: array<object>` — danh sách rút gọn (có `tenantId` join từ hợp đồng)
+  - `detailsTruncated: boolean` — `true` nếu tổng bản ghi vượt quá số dòng trả về
+
 ## 12) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`

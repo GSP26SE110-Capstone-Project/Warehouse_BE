@@ -21,6 +21,7 @@ import transportationProviderRoutes from './src/routes/TransportationProviderRou
 import shipmentRoutes from './src/routes/ShipmentRoutes.js';
 import transportStationRoutes from './src/routes/TransportStationRoutes.js';
 import importExportRecordRoutes from './src/routes/ImportExportRecordRoutes.js';
+import importExportReportRoutes from './src/routes/ImportExportReportRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +45,7 @@ app.use('/api/transportation-providers', transportationProviderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/transport-stations', transportStationRoutes);
 app.use('/api/import-export-records', importExportRecordRoutes);
+app.use('/api/import-export-reports', importExportReportRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {
