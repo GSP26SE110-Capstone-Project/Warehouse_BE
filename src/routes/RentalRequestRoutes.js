@@ -29,10 +29,10 @@ router.use(requireAuth);
 router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createRentalRequest);
 
 // Danh sách rental requests
-router.get('/', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_manager'), listRentalRequests);
+router.get('/', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_manager', 'warehouse_staff', 'transport_staff'), listRentalRequests);
 
 // Lấy chi tiết rental request
-router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_manager'), getRentalRequestById);
+router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_manager', 'warehouse_staff', 'transport_staff'), getRentalRequestById);
 
 // Cập nhật rental request
 router.patch('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), updateRentalRequest);

@@ -358,14 +358,14 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractResponse`
 
 ### `GET /api/contracts`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `page` (default 1), `limit` (default 10), `tenantId`, `status`, `search`; ví dụ `?page=1&limit=10&status=ACTIVE`
 - **Response `200`**
   - `contracts: array<ContractResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/contracts/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ContractResponse`
@@ -418,14 +418,14 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractItemResponse`
 
 ### `GET /api/contract-items`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `contractId`, `rentType`, `page` (default 1), `limit` (default 20)
 - **Response `200`**
   - `items: array<ContractItemResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/contract-items/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ContractItemResponse`
@@ -526,14 +526,14 @@ Swagger UI: cùng host + `/api-docs`
   - `ShipmentResponse`
 
 ### `GET /api/shipments`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff` hoặc `warehouse_staff` (chỉ đọc)
 - **Query** — optional: `page` (default 1), `limit` (default 10), `contractId`, `status`, `shipmentType`, `providerId`
 - **Response `200`**
   - `shipments: array<ShipmentResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/shipments/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff` hoặc `warehouse_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ShipmentResponse`
@@ -644,7 +644,7 @@ Swagger UI: cùng host + `/api-docs`
   - `ImportExportRecordResponse`
 
 ### `PATCH /api/import-export-records/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — update field động (trừ `recordId`, `createdAt`, `updatedAt`), vẫn enforce rule theo `scopeType`
 - **Response `200`**
@@ -711,12 +711,14 @@ Swagger UI: cùng host + `/api-docs`
   - `RentalRequestResponse & { selectedZones: array<string> }`
 
 ### `GET /api/rental-requests`
+- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_manager` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `page`, `limit`, `status`, `tenantId`; ví dụ `?page=1&limit=10&status=PENDING`
 - **Response `200`**
   - `requests: array<RentalRequestResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/rental-requests/{id}`
+- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_manager` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `RentalRequestResponse & { selectedZones: array<object> }`

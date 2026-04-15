@@ -11,13 +11,13 @@ import {
 const router = express.Router();
 
 // Danh sách contracts
-router.get('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin'), listContracts);
+router.get('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin', 'warehouse_staff', 'transport_staff'), listContracts);
 
 // Tạo contract mới
 router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager'), createContract);
 
 // Chi tiết contract
-router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin'), getContractById);
+router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin', 'warehouse_staff', 'transport_staff'), getContractById);
 
 // Cập nhật contract
 router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), updateContract);
