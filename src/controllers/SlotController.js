@@ -149,6 +149,41 @@ export async function getSlotById(req, res) {
   }
 }
 
+const SLOT_STATUSES = ['EMPTY', 'RENTED', 'MAINTENANCE'];
+
+// PATCH /slots/:id/status — chỉ đổi trạng thái (warehouse_staff / admin)
+export async function updateSlotStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (status === undefined || status === null || status === '') {
+      return res.status(400).json({ message: 'status là bắt buộc' });
+    }
+    if (!SLOT_STATUSES.includes(status)) {
+      return res.status(400).json({
+        message: `status phải là một trong: ${SLOT_STATUSES.join(', ')}`,
+      });
+    }
+
+    const query = `
+      UPDATE ${SLOT_TABLE}
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE slot_id = $2
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(query, [status, id]);
+    const slot = mapSlotRow(rows[0]);
+    if (!slot) {
+      return res.status(404).json({ message: 'Slot không tồn tại' });
+    }
+    return res.json(slot);
+  } catch (error) {
+    console.error('Error updating slot status:', error);
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}
+
 // PATCH /slots/:id
 export async function updateSlot(req, res) {
   try {

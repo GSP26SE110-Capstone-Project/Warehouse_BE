@@ -60,9 +60,6 @@ router.get('/', listRacks);
  *             type: object
  *             required: [zoneId, rackCode, length, width, height]
  *             properties:
- *               rackId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng RCK0001
  *               zoneId:
  *                 type: string
  *               rackCode:

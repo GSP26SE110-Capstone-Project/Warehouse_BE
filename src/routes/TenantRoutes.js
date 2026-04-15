@@ -21,9 +21,51 @@ router.use(requireAuth);
  *     summary: Create tenant company profile
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - companyName
+ *               - taxCode
+ *               - contactEmail
+ *             properties:
+ *               tenantId:
+ *                 type: string
+ *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh (prefix TEN)
+ *               companyName:
+ *                 type: string
+ *                 maxLength: 255
+ *               taxCode:
+ *                 type: string
+ *                 maxLength: 50
+ *                 description: Mã số thuế (duy nhất)
+ *               contactEmail:
+ *                 type: string
+ *                 format: email
+ *                 maxLength: 255
+ *                 description: Email liên hệ (duy nhất)
+ *               contactPhone:
+ *                 type: string
+ *                 maxLength: 20
+ *               address:
+ *                 type: string
+ *                 description: Địa chỉ công ty
+ *           example:
+ *             companyName: Công ty TNHH ABC
+ *             taxCode: "0123456789"
+ *             contactEmail: contact@abc.com
+ *             contactPhone: "0901234567"
+ *             address: 123 Đường X, Quận Y, TP.HCM
  *     responses:
  *       201:
  *         description: Tenant created
+ *       400:
+ *         description: Thiếu trường bắt buộc
+ *       409:
+ *         description: Trùng mã số thuế hoặc email
  */
 // Tạo tenant mới (đăng ký doanh nghiệp)
 router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createTenant);
@@ -97,9 +139,47 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), getTenantByI
  *         schema:
  *           type: string
  *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             minProperties: 1
+ *             description: Gửi ít nhất một trường cần cập nhật (camelCase)
+ *             properties:
+ *               companyName:
+ *                 type: string
+ *                 maxLength: 255
+ *               taxCode:
+ *                 type: string
+ *                 maxLength: 50
+ *               contactEmail:
+ *                 type: string
+ *                 format: email
+ *                 maxLength: 255
+ *               contactPhone:
+ *                 type: string
+ *                 maxLength: 20
+ *               address:
+ *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *           examples:
+ *             updateContact:
+ *               summary: Đổi thông tin liên hệ
+ *               value:
+ *                 contactPhone: "0912345678"
+ *                 address: Địa chỉ mới
+ *             deactivate:
+ *               summary: Vô hiệu hóa tenant
+ *               value:
+ *                 isActive: false
  *     responses:
  *       200:
  *         description: Tenant updated
+ *       400:
+ *         description: Body rỗng hoặc không có field hợp lệ
  *       404:
  *         description: Tenant not found
  */

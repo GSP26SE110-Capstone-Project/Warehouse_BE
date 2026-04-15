@@ -51,9 +51,6 @@ router.get('/', listLevels);
  *             type: object
  *             required: [rackId, levelNumber]
  *             properties:
- *               levelId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng LVL0001
  *               rackId:
  *                 type: string
  *               levelNumber:
