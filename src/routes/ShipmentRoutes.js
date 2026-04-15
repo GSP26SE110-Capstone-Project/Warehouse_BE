@@ -10,11 +10,11 @@ import {
 
 const router = express.Router();
 
-router.get('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'transport_staff', 'warehouse_staff'), listShipments);
-router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'transport_staff'), createShipment);
-router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_manager', 'transport_staff', 'warehouse_staff'), getShipmentById);
-router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager', 'transport_staff'), updateShipment);
-router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), deleteShipment);
+router.get('/', requireAuth, requireRoles('admin', 'warehouse_staff', 'transport_staff'), listShipments);
+router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff', 'transport_staff'), createShipment);
+router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_staff', 'transport_staff'), getShipmentById);
+router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff', 'transport_staff'), updateShipment);
+router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), deleteShipment);
 
 export default router;
 

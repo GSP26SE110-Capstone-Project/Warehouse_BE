@@ -50,7 +50,6 @@ export const userSchema = {
     type: 'enum',
     enum: [
       'admin',
-      'warehouse_manager',
       'warehouse_staff',
       'transport_staff',
       'tenant_admin'

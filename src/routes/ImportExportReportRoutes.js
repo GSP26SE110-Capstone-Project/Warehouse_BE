@@ -4,6 +4,6 @@ import { createImportExportReport } from '../controllers/ImportExportReportContr
 
 const router = express.Router();
 
-router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'warehouse_staff'), createImportExportReport);
+router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createImportExportReport);
 
 export default router;

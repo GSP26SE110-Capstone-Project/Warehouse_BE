@@ -215,7 +215,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 4) Warehouses (Model: `Warehouse`)
 
 ### `POST /api/warehouses`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `warehouseId`, `branchId`, `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; các field còn lại tùy chọn
 
 ```json
@@ -253,7 +253,7 @@ Swagger UI: cùng host + `/api-docs`
   - `WarehouseResponse`
 
 ### `PATCH /api/warehouses/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `warehouseId`, `createdAt`, `updatedAt`
 
@@ -271,7 +271,7 @@ Swagger UI: cùng host + `/api-docs`
   - `WarehouseResponse`
 
 ### `DELETE /api/warehouses/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Hành vi** — soft delete (`is_active = false`)
 - **Response `200`**
@@ -335,7 +335,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 6) Contracts (Model: `Contract`)
 
 ### `POST /api/contracts`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `contractId`, `tenantId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; các field còn lại tùy chọn
 
 ```json
@@ -358,20 +358,20 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractResponse`
 
 ### `GET /api/contracts`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `page` (default 1), `limit` (default 10), `tenantId`, `status`, `search`; ví dụ `?page=1&limit=10&status=ACTIVE`
 - **Response `200`**
   - `contracts: array<ContractResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/contracts/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ContractResponse`
 
 ### `PATCH /api/contracts/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `contractId`, `createdAt`, `updatedAt`
 
@@ -387,7 +387,7 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractResponse`
 
 ### `DELETE /api/contracts/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Hành vi** — soft delete/hủy hợp đồng (`status = CANCELLED`)
 - **Response `200`**
@@ -397,7 +397,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 7) Contract Items (Model: `ContractItem`)
 
 ### `POST /api/contract-items`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `itemId`, `contractId`, `rentType`, `unitPrice` bắt buộc
 - **Rule theo `rentType`**
   - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
@@ -418,20 +418,20 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractItemResponse`
 
 ### `GET /api/contract-items`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `contractId`, `rentType`, `page` (default 1), `limit` (default 20)
 - **Response `200`**
   - `items: array<ContractItemResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/contract-items/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `tenant_admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ContractItemResponse`
 
 ### `PATCH /api/contract-items/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `itemId`, `createdAt`, `updatedAt`
 - **Rule theo `rentType`** vẫn được enforce sau khi merge dữ liệu cũ + mới
@@ -446,7 +446,7 @@ Swagger UI: cùng host + `/api-docs`
   - `ContractItemResponse`
 
 ### `DELETE /api/contract-items/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Response `200`**
   - `message: string`
@@ -454,7 +454,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 8) Transportation Providers (Model: `TransportationProvider`)
 
 ### `POST /api/transportation-providers`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `providerId`, `name` bắt buộc; `providerType`, `contactInfo`, `isActive` tùy chọn
 
 ```json
@@ -471,27 +471,27 @@ Swagger UI: cùng host + `/api-docs`
   - `TransportationProviderResponse`
 
 ### `GET /api/transportation-providers`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Query** — optional: `page` (default 1), `limit` (default 10), `providerType`, `isActive`, `search`
 - **Response `200`**
   - `providers: array<TransportationProviderResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/transportation-providers/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Path** — `id`
 - **Response `200`**
   - `TransportationProviderResponse`
 
 ### `PATCH /api/transportation-providers/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — các field hợp lệ: `name`, `providerType`, `contactInfo`, `isActive`
 - **Response `200`**
   - `TransportationProviderResponse`
 
 ### `DELETE /api/transportation-providers/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Hành vi** — soft delete (`is_active = false`)
 - **Response `200`**
@@ -501,7 +501,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 9) Shipments (Model: `Shipment`)
 
 ### `POST /api/shipments`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Request body** — `shipmentId`, `contractId`, `shipmentType`, `fromAddress`, `toAddress` bắt buộc
 
 ```json
@@ -526,27 +526,27 @@ Swagger UI: cùng host + `/api-docs`
   - `ShipmentResponse`
 
 ### `GET /api/shipments`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff` hoặc `warehouse_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `page` (default 1), `limit` (default 10), `contractId`, `status`, `shipmentType`, `providerId`
 - **Response `200`**
   - `shipments: array<ShipmentResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/shipments/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff` hoặc `warehouse_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `ShipmentResponse`
 
 ### `PATCH /api/shipments/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Path** — `id`
 - **Request body** — các field hợp lệ của shipment trừ `shipmentId`, `createdAt`, `updatedAt`
 - **Response `200`**
   - `ShipmentResponse`
 
 ### `DELETE /api/shipments/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Hành vi** — soft delete/hủy shipment (`status = CANCELLED`)
 - **Response `200`**
@@ -556,7 +556,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 10) Transport Stations (Model: `TransportStation`)
 
 ### `POST /api/transport-stations`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `stationId`, `providerId`, `stationName` bắt buộc; `address`, `managerId` tùy chọn
 
 ```json
@@ -573,27 +573,27 @@ Swagger UI: cùng host + `/api-docs`
   - `TransportStationResponse`
 
 ### `GET /api/transport-stations`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Query** — optional: `page` (default 1), `limit` (default 10), `providerId`, `managerId`, `search`
 - **Response `200`**
   - `stations: array<TransportStationResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/transport-stations/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `transport_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
 - **Path** — `id`
 - **Response `200`**
   - `TransportStationResponse`
 
 ### `PATCH /api/transport-stations/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — các field hợp lệ: `providerId`, `stationName`, `address`, `managerId`
 - **Response `200`**
   - `TransportStationResponse`
 
 ### `DELETE /api/transport-stations/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Response `200`**
   - `message: string`
@@ -601,7 +601,7 @@ Swagger UI: cùng host + `/api-docs`
 ## 11) Import/Export Records (Model: `ImportExportRecord`)
 
 ### `POST /api/import-export-records`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `recordId`, `contractId`, `warehouseId`, `recordType`, `recordCode`, `scheduledDatetime` bắt buộc
 - **Rule theo `scopeType`**
   - `WAREHOUSE` -> không bắt buộc `zoneId`/`slotId`
@@ -631,27 +631,27 @@ Swagger UI: cùng host + `/api-docs`
   - `ImportExportRecordResponse`
 
 ### `GET /api/import-export-records`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Query** — optional: `page`, `limit`, `contractId`, `warehouseId`, `recordType`, `status`, `scopeType`, `scheduledFrom`, `scheduledTo`, `search`
 - **Response `200`**
   - `records: array<ImportExportRecordResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/import-export-records/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Response `200`**
   - `ImportExportRecordResponse`
 
 ### `PATCH /api/import-export-records/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Request body** — update field động (trừ `recordId`, `createdAt`, `updatedAt`), vẫn enforce rule theo `scopeType`
 - **Response `200`**
   - `ImportExportRecordResponse`
 
 ### `DELETE /api/import-export-records/{id}`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
 - **Hành vi** — soft delete/hủy phiếu (`status = CANCELLED`)
 - **Response `200`**
@@ -659,7 +659,7 @@ Swagger UI: cùng host + `/api-docs`
   - `record: ImportExportRecordResponse`
 
 ### `POST /api/import-export-reports`
-- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Mục đích** — Tạo báo cáo xuất nhập theo kỳ (tổng hợp từ `import_export_records`), trả JSON; **không** lưu bản ghi báo cáo vào database.
 - **Request body** — `from`, `to` bắt buộc (ISO datetime); các field còn lại tùy chọn
 
@@ -711,14 +711,14 @@ Swagger UI: cùng host + `/api-docs`
   - `RentalRequestResponse & { selectedZones: array<string> }`
 
 ### `GET /api/rental-requests`
-- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_manager` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Query** — optional: `page`, `limit`, `status`, `tenantId`; ví dụ `?page=1&limit=10&status=PENDING`
 - **Response `200`**
   - `requests: array<RentalRequestResponse>`
   - `pagination: PaginationResponse`
 
 ### `GET /api/rental-requests/{id}`
-- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_manager` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
+- **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
   - `RentalRequestResponse & { selectedZones: array<object> }`
