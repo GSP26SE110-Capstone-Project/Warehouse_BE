@@ -4,6 +4,7 @@ import {
   createSlot,
   listSlots,
   getSlotById,
+  updateSlotStatus,
   updateSlot,
   deleteSlot,
 } from '../controllers/SlotController.js';
@@ -60,9 +61,6 @@ router.get('/', listSlots);
  *             type: object
  *             required: [levelId, slotCode, length, width, height]
  *             properties:
- *               slotId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng SLT0001
  *               levelId:
  *                 type: string
  *               slotCode:
@@ -102,6 +100,41 @@ router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createSl
  *         description: Slot not found
  */
 router.get('/:id', getSlotById);
+
+/**
+ * @swagger
+ * /api/slots/{id}/status:
+ *   patch:
+ *     tags: [Slots]
+ *     summary: Cập nhật trạng thái slot (EMPTY / RENTED / MAINTENANCE)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [EMPTY, RENTED, MAINTENANCE]
+ *     responses:
+ *       200:
+ *         description: Slot status updated
+ *       400:
+ *         description: Invalid body
+ *       404:
+ *         description: Slot not found
+ */
+router.patch('/:id/status', requireAuth, requireRoles('admin', 'warehouse_staff'), updateSlotStatus);
 
 /**
  * @swagger
