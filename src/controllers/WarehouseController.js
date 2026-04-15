@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as WAREHOUSE_TABLE } from '../models/Warehouse.js';
+import { tableName as USER_TABLE } from '../models/User.js';
 
 // Map DB row -> domain object
 function mapWarehouseRow(row) {
@@ -20,7 +21,7 @@ function mapWarehouseRow(row) {
     width: row.width,
     height: row.height,
     totalArea: row.total_area,
-    totalCapacity: row.total_capacity,
+    usableArea: row.usable_area,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -28,8 +29,6 @@ function mapWarehouseRow(row) {
 }
 
 const CREATE_REQUIRED_FIELDS = [
-  'warehouseId',
-  'branchId',
   'warehouseCode',
   'warehouseName',
   'warehouseType',
@@ -39,12 +38,55 @@ const CREATE_REQUIRED_FIELDS = [
   'height',
 ];
 
+async function generateWarehouseId() {
+  const query = `
+    SELECT warehouse_id
+    FROM ${WAREHOUSE_TABLE}
+    WHERE warehouse_id ~ '^WH[0-9]+$'
+    ORDER BY CAST(SUBSTRING(warehouse_id FROM 3) AS INTEGER) DESC
+    LIMIT 1;
+  `;
+  const { rows } = await pool.query(query);
+  const lastWarehouseId = rows[0]?.warehouse_id;
+  const lastNumber = lastWarehouseId ? Number(lastWarehouseId.slice(2)) : 0;
+  const nextNumber = Number.isNaN(lastNumber) ? 1 : lastNumber + 1;
+  return `WH${String(nextNumber).padStart(4, '0')}`;
+}
+
+async function resolveBranchId({ branchId, managerId, currentUserId }) {
+  if (branchId) return branchId;
+
+  if (managerId) {
+    const managerQuery = `
+      SELECT branch_id
+      FROM ${USER_TABLE}
+      WHERE user_id = $1
+      LIMIT 1;
+    `;
+    const { rows: managerRows } = await pool.query(managerQuery, [managerId]);
+    if (managerRows[0]?.branch_id) return managerRows[0].branch_id;
+  }
+
+  if (currentUserId) {
+    const currentUserQuery = `
+      SELECT branch_id
+      FROM ${USER_TABLE}
+      WHERE user_id = $1
+      LIMIT 1;
+    `;
+    const { rows: currentUserRows } = await pool.query(currentUserQuery, [currentUserId]);
+    if (currentUserRows[0]?.branch_id) return currentUserRows[0].branch_id;
+  }
+
+  return null;
+}
+
 // POST /warehouses - Tạo warehouse mới
 export async function createWarehouse(req, res) {
   try {
     const {
-      warehouseId,
-      branchId,
+      warehouseId: incomingWarehouseId = null,
+      branchId: incomingBranchId = null,
       managerId = null,
       warehouseCode,
       warehouseName,
@@ -57,11 +99,16 @@ export async function createWarehouse(req, res) {
       length,
       width,
       height,
-      totalCapacity = null,
+      usableArea = null,
     } = req.body;
+    const warehouseId = incomingWarehouseId || await generateWarehouseId();
+    const branchId = await resolveBranchId({
+      branchId: incomingBranchId,
+      managerId,
+      currentUserId: req.user?.userId,
+    });
 
     const requiredPayload = {
-      warehouseId,
       branchId,
       warehouseCode,
       warehouseName,
@@ -71,6 +118,11 @@ export async function createWarehouse(req, res) {
       width,
       height,
     };
+    if (!branchId) {
+      return res.status(400).json({
+        message: 'Không xác định được branchId. Hãy truyền branchId hoặc dùng manager/user có branchId hợp lệ',
+      });
+    }
     const missing = CREATE_REQUIRED_FIELDS.filter((field) => requiredPayload[field] === undefined || requiredPayload[field] === null || requiredPayload[field] === '');
     if (missing.length > 0) {
       return res.status(400).json({
@@ -111,7 +163,7 @@ export async function createWarehouse(req, res) {
         width,
         height,
         total_area,
-        total_capacity,
+        usable_area,
         is_active
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
@@ -133,7 +185,7 @@ export async function createWarehouse(req, res) {
       width,
       height,
       totalArea,
-      totalCapacity,
+      usableArea,
     ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapWarehouseRow(rows[0]));
@@ -251,7 +303,7 @@ export async function updateWarehouse(req, res) {
       'length',
       'width',
       'height',
-      'totalCapacity',
+      'usableArea',
       'isActive',
     ];
 

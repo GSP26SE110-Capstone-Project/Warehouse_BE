@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as RECORD_TABLE } from '../models/ImportExportRecord.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapRecordRow(row) {
   if (!row) return null;
@@ -39,7 +40,7 @@ function validateScope({ scopeType, zoneId, slotId }) {
 export async function createImportExportRecord(req, res) {
   try {
     const {
-      recordId,
+      recordId: incomingRecordId = null,
       contractId,
       warehouseId,
       scopeType = 'ZONE',
@@ -59,10 +60,15 @@ export async function createImportExportRecord(req, res) {
       cancelReason = null,
       notes = null,
     } = req.body;
+    const recordId = incomingRecordId || await generatePrefixedId(pool, {
+      tableName: RECORD_TABLE,
+      idColumn: 'record_id',
+      prefix: 'IER',
+    });
 
-    if (!recordId || !contractId || !warehouseId || !recordType || !recordCode || !scheduledDatetime) {
+    if (!contractId || !warehouseId || !recordType || !recordCode || !scheduledDatetime) {
       return res.status(400).json({
-        message: 'recordId, contractId, warehouseId, recordType, recordCode, scheduledDatetime là bắt buộc',
+        message: 'contractId, warehouseId, recordType, recordCode, scheduledDatetime là bắt buộc',
       });
     }
 

@@ -60,12 +60,14 @@ router.get('/', listWarehouses);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [warehouseId, branchId, warehouseCode, warehouseName, warehouseType, address, length, width, height]
+ *             required: [warehouseCode, warehouseName, warehouseType, address, length, width, height]
  *             properties:
  *               warehouseId:
  *                 type: string
+ *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng WH0001
  *               branchId:
  *                 type: string
+ *                 description: Tùy chọn. Nếu không gửi, hệ thống tự suy ra từ managerId hoặc user đăng nhập
  *               managerId:
  *                 type: string
  *               warehouseCode:

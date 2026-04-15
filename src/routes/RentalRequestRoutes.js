@@ -28,7 +28,6 @@ router.use(requireAuth);
  *           schema:
  *             type: object
  *             required:
- *               - requestId
  *               - customerType
  *               - contactName
  *               - contactPhone
@@ -43,6 +42,7 @@ router.use(requireAuth);
  *             properties:
  *               requestId:
  *                 type: string
+ *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng RRQ0001
  *               customerType:
  *                 type: string
  *                 enum: [individual, business]

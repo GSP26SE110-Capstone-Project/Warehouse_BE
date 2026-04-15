@@ -43,6 +43,27 @@ router.get('/', listZones);
  *     summary: Create a new zone
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [warehouseId, zoneCode, length, width]
+ *             properties:
+ *               warehouseId:
+ *                 type: string
+ *               zoneCode:
+ *                 type: string
+ *               zoneName:
+ *                 type: string
+ *               zoneType:
+ *                 type: string
+ *                 enum: [cold_storage, normal_storage]
+ *               length:
+ *                 type: number
+ *               width:
+ *                 type: number
  *     responses:
  *       201:
  *         description: Zone created

@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as ZONE_TABLE } from '../models/Zone.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapZoneRow(row) {
   if (!row) return null;
@@ -79,7 +80,7 @@ export async function listZones(req, res) {
 export async function createZone(req, res) {
   try {
     const {
-      zoneId,
+      zoneId: incomingZoneId = null,
       warehouseId,
       zoneCode,
       zoneName = null,
@@ -87,9 +88,14 @@ export async function createZone(req, res) {
       length,
       width,
     } = req.body;
+    const zoneId = incomingZoneId || await generatePrefixedId(pool, {
+      tableName: ZONE_TABLE,
+      idColumn: 'zone_id',
+      prefix: 'ZN',
+    });
 
-    if (!zoneId || !warehouseId || !zoneCode || length === undefined || width === undefined) {
-      return res.status(400).json({ message: 'zoneId, warehouseId, zoneCode, length, width là bắt buộc' });
+    if (!warehouseId || !zoneCode || length === undefined || width === undefined) {
+      return res.status(400).json({ message: 'warehouseId, zoneCode, length, width là bắt buộc' });
     }
 
     const totalArea = Number(length) * Number(width);

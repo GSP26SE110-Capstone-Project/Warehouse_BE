@@ -26,10 +26,11 @@ router.use(requireAuth);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [requestId, contractId, shipmentType, fromAddress, toAddress]
+ *             required: [contractId, shipmentType, fromAddress, toAddress]
  *             properties:
  *               requestId:
  *                 type: string
+ *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng SRQ0001
  *               contractId:
  *                 type: string
  *               shipmentType:

@@ -4,6 +4,7 @@ import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapContractRow(row) {
   if (!row) return null;
@@ -67,7 +68,7 @@ async function createNotification(client, userId, { type, title, content }) {
 export async function createContract(req, res) {
   try {
     const {
-      contractId,
+      contractId: incomingContractId = null,
       requestId,
       tenantId = null,
       approvedBy = null,
@@ -79,10 +80,15 @@ export async function createContract(req, res) {
       totalRentalFee,
       status = 'DRAFT',
     } = req.body;
+    const contractId = incomingContractId || await generatePrefixedId(pool, {
+      tableName: CONTRACT_TABLE,
+      idColumn: 'contract_id',
+      prefix: 'CTR',
+    });
 
-    if (!contractId || !requestId || !contractCode || !startDate || !endDate || totalRentalFee === undefined) {
+    if (!requestId || !contractCode || !startDate || !endDate || totalRentalFee === undefined) {
       return res.status(400).json({
-        message: 'contractId, requestId, contractCode, startDate, endDate, totalRentalFee là bắt buộc',
+        message: 'requestId, contractCode, startDate, endDate, totalRentalFee là bắt buộc',
       });
     }
 

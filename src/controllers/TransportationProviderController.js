@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as PROVIDER_TABLE } from '../models/TransportationProvider.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapProviderRow(row) {
   if (!row) return null;
@@ -18,15 +19,20 @@ function mapProviderRow(row) {
 export async function createTransportationProvider(req, res) {
   try {
     const {
-      providerId,
+      providerId: incomingProviderId = null,
       name,
       providerType = null,
       contactInfo = null,
       isActive = true,
     } = req.body;
+    const providerId = incomingProviderId || await generatePrefixedId(pool, {
+      tableName: PROVIDER_TABLE,
+      idColumn: 'provider_id',
+      prefix: 'TPR',
+    });
 
-    if (!providerId || !name) {
-      return res.status(400).json({ message: 'providerId, name là bắt buộc' });
+    if (!name) {
+      return res.status(400).json({ message: 'name là bắt buộc' });
     }
 
     const conflictQuery = `
