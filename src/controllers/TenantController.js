@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as TENANT_TABLE } from '../models/Tenant.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 // Map DB row -> domain object
 function mapTenantRow(row) {
@@ -21,17 +22,22 @@ function mapTenantRow(row) {
 export async function createTenant(req, res) {
   try {
     const {
-      tenantId,
+      tenantId: incomingTenantId = null,
       companyName,
       taxCode,
       contactEmail,
       contactPhone,
       address,
     } = req.body;
+    const tenantId = incomingTenantId || await generatePrefixedId(pool, {
+      tableName: TENANT_TABLE,
+      idColumn: 'tenant_id',
+      prefix: 'TEN',
+    });
 
-    if (!tenantId || !companyName || !taxCode || !contactEmail) {
+    if (!companyName || !taxCode || !contactEmail) {
       return res.status(400).json({
-        message: 'tenantId, companyName, taxCode, contactEmail là bắt buộc'
+        message: 'companyName, taxCode, contactEmail là bắt buộc'
       });
     }
 

@@ -6,6 +6,7 @@ import { tableName as SHIPMENT_TABLE } from '../models/Shipment.js';
 import { tableName as TRANSPORT_CONTRACT_TABLE } from '../models/TransportContract.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapShipmentRequestRow(row) {
   if (!row) return null;
@@ -56,7 +57,7 @@ export async function createShipmentRequest(req, res) {
     }
 
     const {
-      requestId,
+      requestId: incomingRequestId = null,
       contractId,
       shipmentType,
       fromAddress,
@@ -64,10 +65,15 @@ export async function createShipmentRequest(req, res) {
       preferredPickupTime = null,
       notes = null,
     } = req.body;
+    const requestId = incomingRequestId || await generatePrefixedId(pool, {
+      tableName: SHIPMENT_REQUEST_TABLE,
+      idColumn: 'request_id',
+      prefix: 'SRQ',
+    });
 
-    if (!requestId || !contractId || !shipmentType || !fromAddress || !toAddress) {
+    if (!contractId || !shipmentType || !fromAddress || !toAddress) {
       return res.status(400).json({
-        message: 'requestId, contractId, shipmentType, fromAddress, toAddress là bắt buộc',
+        message: 'contractId, shipmentType, fromAddress, toAddress là bắt buộc',
       });
     }
 

@@ -4,6 +4,7 @@ import { tableName as SHIPMENT_TABLE } from '../models/Shipment.js';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapShipmentRow(row) {
   if (!row) return null;
@@ -51,7 +52,7 @@ async function createNotification(client, userId, title, content) {
 export async function createShipment(req, res) {
   try {
     const {
-      shipmentId,
+      shipmentId: incomingShipmentId = null,
       contractId,
       shipmentType,
       providerId = null,
@@ -67,10 +68,15 @@ export async function createShipment(req, res) {
       shippingFee = null,
       status = 'SCHEDULING',
     } = req.body;
+    const shipmentId = incomingShipmentId || await generatePrefixedId(pool, {
+      tableName: SHIPMENT_TABLE,
+      idColumn: 'shipment_id',
+      prefix: 'SHP',
+    });
 
-    if (!shipmentId || !contractId || !shipmentType || !fromAddress || !toAddress) {
+    if (!contractId || !shipmentType || !fromAddress || !toAddress) {
       return res.status(400).json({
-        message: 'shipmentId, contractId, shipmentType, fromAddress, toAddress là bắt buộc',
+        message: 'contractId, shipmentType, fromAddress, toAddress là bắt buộc',
       });
     }
 

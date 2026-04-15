@@ -6,6 +6,7 @@ import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { tableName as USER_TABLE } from '../models/User.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 // Map DB row -> domain object
 function mapRentalRequestRow(row) {
@@ -150,7 +151,7 @@ export async function createRentalRequest(req, res) {
     await client.query('BEGIN');
 
     const {
-      requestId,
+      requestId: incomingRequestId = null,
       customerType,
       tenantId,
       contactName,
@@ -168,10 +169,11 @@ export async function createRentalRequest(req, res) {
       notes,
       selectedZones, // array of zoneIds
     } = req.body;
-
-    if (!requestId) {
-      return res.status(400).json({ message: 'requestId là bắt buộc' });
-    }
+    const requestId = incomingRequestId || await generatePrefixedId(pool, {
+      tableName: RENTAL_REQUEST_TABLE,
+      idColumn: 'request_id',
+      prefix: 'RRQ',
+    });
 
     const validationError = validateRentalRequestPayload({
       customerType,

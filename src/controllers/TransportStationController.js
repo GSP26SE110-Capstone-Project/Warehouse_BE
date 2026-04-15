@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as STATION_TABLE } from '../models/TransportStation.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapTransportStationRow(row) {
   if (!row) return null;
@@ -18,16 +19,21 @@ function mapTransportStationRow(row) {
 export async function createTransportStation(req, res) {
   try {
     const {
-      stationId,
+      stationId: incomingStationId = null,
       providerId,
       stationName,
       address = null,
       managerId = null,
     } = req.body;
+    const stationId = incomingStationId || await generatePrefixedId(pool, {
+      tableName: STATION_TABLE,
+      idColumn: 'station_id',
+      prefix: 'STN',
+    });
 
-    if (!stationId || !providerId || !stationName) {
+    if (!providerId || !stationName) {
       return res.status(400).json({
-        message: 'stationId, providerId, stationName là bắt buộc',
+        message: 'providerId, stationName là bắt buộc',
       });
     }
 

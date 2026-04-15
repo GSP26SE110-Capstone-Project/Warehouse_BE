@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapContractItemRow(row) {
   if (!row) return null;
@@ -27,7 +28,7 @@ function validateRentTypePayload({ rentType, warehouseId, zoneId, slotId }) {
 export async function createContractItem(req, res) {
   try {
     const {
-      itemId,
+      itemId: incomingItemId = null,
       contractId,
       rentType,
       warehouseId = null,
@@ -35,10 +36,15 @@ export async function createContractItem(req, res) {
       slotId = null,
       unitPrice,
     } = req.body;
+    const itemId = incomingItemId || await generatePrefixedId(pool, {
+      tableName: CONTRACT_ITEM_TABLE,
+      idColumn: 'item_id',
+      prefix: 'ITM',
+    });
 
-    if (!itemId || !contractId || !rentType || unitPrice === undefined) {
+    if (!contractId || !rentType || unitPrice === undefined) {
       return res.status(400).json({
-        message: 'itemId, contractId, rentType, unitPrice là bắt buộc',
+        message: 'contractId, rentType, unitPrice là bắt buộc',
       });
     }
     if (!validateRentTypePayload({ rentType, warehouseId, zoneId, slotId })) {
