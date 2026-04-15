@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { tableName as SHIPMENT_REQUEST_TABLE } from '../models/ShipmentRequest.js';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as SHIPMENT_TABLE } from '../models/Shipment.js';
+import { tableName as TRANSPORT_CONTRACT_TABLE } from '../models/TransportContract.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 
@@ -22,6 +23,7 @@ function mapShipmentRequestRow(row) {
     approvedAt: row.approved_at,
     rejectedReason: row.rejected_reason,
     shipmentId: row.shipment_id,
+    transportContractId: row.transport_contract_id,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -209,15 +211,6 @@ export async function approveShipmentRequest(req, res) {
   try {
     const { id } = req.params;
     const reviewedBy = req.user?.userId || req.body.reviewedBy;
-    const {
-      shipmentId = randomUUID(),
-      providerId = null,
-      driverId = null,
-      scheduledTime = null,
-      totalWeight = null,
-      totalDistance = null,
-      shippingFee = null,
-    } = req.body;
 
     await client.query('BEGIN');
     const { rows } = await client.query(
@@ -235,38 +228,31 @@ export async function approveShipmentRequest(req, res) {
       return res.status(404).json({ message: 'Request không tồn tại hoặc đã được xử lý' });
     }
 
-    const supervisorId = reviewedBy || null;
+    const transportContractId = randomUUID();
+    const contractCode = `TC-${Date.now()}`;
     await client.query(
       `
-      INSERT INTO ${SHIPMENT_TABLE} (
-        shipment_id, contract_id, shipment_type, provider_id, driver_id, supervisor_id,
-        from_address, to_address, scheduled_time, total_weight, total_distance, shipping_fee, status
+      INSERT INTO ${TRANSPORT_CONTRACT_TABLE} (
+        transport_contract_id, shipment_request_id, tenant_id, contract_code, status, notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'SCHEDULING')
+      VALUES ($1, $2, $3, $4, 'DRAFT', $5)
       `,
       [
-        shipmentId,
-        request.contract_id,
-        request.shipment_type,
-        providerId,
-        driverId,
-        supervisorId,
-        request.from_address,
-        request.to_address,
-        scheduledTime || request.preferred_pickup_time,
-        totalWeight,
-        totalDistance,
-        shippingFee,
+        transportContractId,
+        request.request_id,
+        request.tenant_id,
+        contractCode,
+        request.notes,
       ],
     );
 
     await client.query(
       `
       UPDATE ${SHIPMENT_REQUEST_TABLE}
-      SET shipment_id = $2, updated_at = CURRENT_TIMESTAMP
+      SET transport_contract_id = $2, updated_at = CURRENT_TIMESTAMP
       WHERE request_id = $1
       `,
-      [id, shipmentId],
+      [id, transportContractId],
     );
 
     const { rows: tenantUsers } = await client.query(
@@ -278,22 +264,15 @@ export async function approveShipmentRequest(req, res) {
         client,
         row.user_id,
         'Yeu cau van chuyen da duoc chap nhan',
-        `Yeu cau ${request.request_id} da duoc chap nhan. Ma van chuyen: ${shipmentId}.`,
-      );
-    }
-    if (driverId) {
-      await notifyUser(
-        client,
-        driverId,
-        'Ban duoc phan cong van chuyen',
-        `Ban duoc phan cong cho shipment ${shipmentId}.`,
+        `Yeu cau ${request.request_id} da duoc chap nhan. Hop dong van chuyen: ${contractCode}.`,
       );
     }
 
     await client.query('COMMIT');
     return res.json({
       ...mapShipmentRequestRow(request),
-      shipmentId,
+      transportContractId,
+      transportContractCode: contractCode,
     });
   } catch (error) {
     await client.query('ROLLBACK');

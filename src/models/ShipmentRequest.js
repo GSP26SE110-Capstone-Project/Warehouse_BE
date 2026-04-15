@@ -65,6 +65,12 @@ export const shipmentRequestSchema = {
     foreignKey: 'shipment_id',
     note: 'Shipment được tạo khi request được duyệt',
   },
+  transportContractId: {
+    type: 'string',
+    required: false,
+    foreignKey: 'transport_contract_id',
+    note: 'Hop dong van chuyen duoc tao khi request duoc duyet',
+  },
   createdBy: {
     type: 'string',
     required: true,
