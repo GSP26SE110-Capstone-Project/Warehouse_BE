@@ -1,7 +1,11 @@
 import pool from '../config/db.js';
+import { randomUUID } from 'crypto';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
 import { tableName as RENTAL_REQUEST_ZONE_TABLE } from '../models/RentalRequestZone.js';
 import { tableName as ZONE_TABLE } from '../models/Zone.js';
+import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
+import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
+import { tableName as USER_TABLE } from '../models/User.js';
 
 // Map DB row -> domain object
 function mapRentalRequestRow(row) {
@@ -105,6 +109,38 @@ function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   }
 
   return null;
+}
+
+async function findNotifiedUserIds(client, rentalRequestRow) {
+  const result = new Set();
+  if (rentalRequestRow.tenant_id) {
+    const { rows } = await client.query(
+      `SELECT user_id FROM ${USER_TABLE} WHERE tenant_id = $1 AND role = 'tenant_admin'`,
+      [rentalRequestRow.tenant_id],
+    );
+    rows.forEach((row) => result.add(row.user_id));
+  }
+
+  if (rentalRequestRow.contact_email) {
+    const { rows } = await client.query(
+      `SELECT user_id FROM ${USER_TABLE} WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [rentalRequestRow.contact_email],
+    );
+    if (rows[0]?.user_id) result.add(rows[0].user_id);
+  }
+  return Array.from(result);
+}
+
+async function createNotifications(client, userIds, { type, title, content }) {
+  for (const userId of userIds) {
+    await client.query(
+      `
+      INSERT INTO ${NOTIFICATION_TABLE} (notification_id, user_id, type, title, content, is_read)
+      VALUES ($1, $2, $3, $4, $5, false)
+      `,
+      [randomUUID(), userId, type, title, content],
+    );
+  }
 }
 
 // POST /rental-requests - Tạo rental request mới
@@ -463,38 +499,107 @@ export async function updateRentalRequest(req, res) {
 
 // POST /rental-requests/:id/approve - Approve rental request
 export async function approveRentalRequest(req, res) {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { approvedBy } = req.body;
+    const approvedBy = req.body.approvedBy || req.user?.userId;
 
     if (!approvedBy) {
       return res.status(400).json({ message: 'approvedBy là bắt buộc' });
     }
 
-    const query = `
+    await client.query('BEGIN');
+
+    const updateQuery = `
       UPDATE ${RENTAL_REQUEST_TABLE}
       SET status = 'APPROVED', approved_by = $2, updated_at = CURRENT_TIMESTAMP
       WHERE request_id = $1 AND status = 'PENDING'
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(query, [id, approvedBy]);
-    if (rows.length === 0) {
+    const { rows } = await client.query(updateQuery, [id, approvedBy]);
+    const approvedRequest = rows[0];
+    if (!approvedRequest) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Request không tồn tại hoặc đã được xử lý' });
     }
 
-    return res.json(mapRentalRequestRow(rows[0]));
+    const { rows: existingContractRows } = await client.query(
+      `SELECT contract_id FROM ${CONTRACT_TABLE} WHERE request_id = $1 LIMIT 1`,
+      [id],
+    );
+    let generatedContractId = existingContractRows[0]?.contract_id || null;
+
+    if (!generatedContractId && approvedRequest.tenant_id) {
+      generatedContractId = randomUUID();
+      const contractCode = `CT-${Date.now()}`;
+
+      await client.query(
+        `
+        INSERT INTO ${CONTRACT_TABLE} (
+          contract_id,
+          request_id,
+          tenant_id,
+          approved_by,
+          contract_code,
+          start_date,
+          end_date,
+          billing_cycle,
+          rental_duration_days,
+          total_rental_fee,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $6 + (($7 || ' days')::interval), $8, $7, $9, 'DRAFT')
+        `,
+        [
+          generatedContractId,
+          approvedRequest.request_id,
+          approvedRequest.tenant_id,
+          approvedBy,
+          contractCode,
+          approvedRequest.requested_start_date,
+          approvedRequest.duration_days,
+          approvedRequest.rental_term_unit,
+          0,
+        ],
+      );
+    }
+
+    const userIds = await findNotifiedUserIds(client, approvedRequest);
+    if (userIds.length > 0) {
+      await createNotifications(client, userIds, {
+        type: 'REQUEST_STATUS',
+        title: 'Don thue kho da duoc chap nhan',
+        content: `Yeu cau ${approvedRequest.request_id} da duoc duyet. Hop dong nhap: ${generatedContractId}.`,
+      });
+    }
+
+    await client.query('COMMIT');
+    return res.json({
+      ...mapRentalRequestRow(approvedRequest),
+      generatedContractId,
+    });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error approving rental request:', error);
     return res.status(500).json({ message: 'Lỗi server' });
+  } finally {
+    client.release();
   }
 }
 
 // POST /rental-requests/:id/reject - Reject rental request
 export async function rejectRentalRequest(req, res) {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { approvedBy, rejectedReason } = req.body;
+    const approvedBy = req.body.approvedBy || req.user?.userId;
+    const { rejectedReason } = req.body;
+    if (!rejectedReason) {
+      return res.status(400).json({ message: 'rejectedReason là bắt buộc' });
+    }
+
+    await client.query('BEGIN');
 
     const query = `
       UPDATE ${RENTAL_REQUEST_TABLE}
@@ -503,14 +608,29 @@ export async function rejectRentalRequest(req, res) {
       RETURNING *;
     `;
 
-    const { rows } = await pool.query(query, [id, approvedBy, rejectedReason]);
-    if (rows.length === 0) {
+    const { rows } = await client.query(query, [id, approvedBy, rejectedReason]);
+    const rejectedRequest = rows[0];
+    if (!rejectedRequest) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Request không tồn tại hoặc đã được xử lý' });
     }
 
-    return res.json(mapRentalRequestRow(rows[0]));
+    const userIds = await findNotifiedUserIds(client, rejectedRequest);
+    if (userIds.length > 0) {
+      await createNotifications(client, userIds, {
+        type: 'REQUEST_STATUS',
+        title: 'Don thue kho da bi tu choi',
+        content: `Yeu cau ${rejectedRequest.request_id} bi tu choi. Ly do: ${rejectedReason}`,
+      });
+    }
+
+    await client.query('COMMIT');
+    return res.json(mapRentalRequestRow(rejectedRequest));
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error rejecting rental request:', error);
     return res.status(500).json({ message: 'Lỗi server' });
+  } finally {
+    client.release();
   }
 }

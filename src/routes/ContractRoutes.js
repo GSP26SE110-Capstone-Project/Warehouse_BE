@@ -6,6 +6,8 @@ import {
   getContractById,
   updateContract,
   deleteContract,
+  sendContractToTenant,
+  signContractByTenant,
 } from '../controllers/ContractController.js';
 
 const router = express.Router();
@@ -21,6 +23,12 @@ router.get('/:id', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse
 
 // Cập nhật contract
 router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), updateContract);
+
+// Gui hop dong cho tenant
+router.post('/:id/send', requireAuth, requireRoles('admin', 'warehouse_staff'), sendContractToTenant);
+
+// Tenant ky hop dong
+router.post('/:id/sign', requireAuth, requireRoles('tenant_admin'), signContractByTenant);
 
 // Hủy contract (soft delete)
 router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), deleteContract);

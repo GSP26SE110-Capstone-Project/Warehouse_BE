@@ -196,12 +196,18 @@ CREATE TABLE IF NOT EXISTS contracts (
     billing_cycle VARCHAR(50) CHECK (billing_cycle IN ('QUARTER', 'MONTH', 'YEAR', 'CUSTOM')),
     rental_duration_days INTEGER,
     total_rental_fee DECIMAL(15, 2) NOT NULL,
-    status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXPIRED', 'CANCELLED')),
+    contract_file_url TEXT,
+    sent_at TIMESTAMP,
+    tenant_signed_at TIMESTAMP,
+    signed_by VARCHAR(50),
+    signature_method VARCHAR(20) CHECK (signature_method IN ('E_SIGN', 'CONFIRM')),
+    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SENT_TO_TENANT', 'SIGNED_BY_TENANT', 'ACTIVE', 'EXPIRED', 'CANCELLED')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES rental_requests(request_id) ON DELETE SET NULL,
     FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
-    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL
+    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (signed_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS contract_items (
