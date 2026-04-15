@@ -20,6 +20,7 @@ import contractItemRoutes from './src/routes/ContractItemRoutes.js';
 import transportationProviderRoutes from './src/routes/TransportationProviderRoutes.js';
 import shipmentRoutes from './src/routes/ShipmentRoutes.js';
 import transportStationRoutes from './src/routes/TransportStationRoutes.js';
+import importExportRecordRoutes from './src/routes/ImportExportRecordRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,7 @@ app.use('/api/contract-items', contractItemRoutes);
 app.use('/api/transportation-providers', transportationProviderRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/transport-stations', transportStationRoutes);
+app.use('/api/import-export-records', importExportRecordRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {
