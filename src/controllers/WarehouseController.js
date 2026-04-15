@@ -21,7 +21,7 @@ function mapWarehouseRow(row) {
     width: row.width,
     height: row.height,
     totalArea: row.total_area,
-    totalCapacity: row.total_capacity,
+    usableArea: row.usable_area,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -99,7 +99,7 @@ export async function createWarehouse(req, res) {
       length,
       width,
       height,
-      totalCapacity = null,
+      usableArea = null,
     } = req.body;
     const warehouseId = incomingWarehouseId || await generateWarehouseId();
     const branchId = await resolveBranchId({
@@ -163,7 +163,7 @@ export async function createWarehouse(req, res) {
         width,
         height,
         total_area,
-        total_capacity,
+        usable_area,
         is_active
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
@@ -185,7 +185,7 @@ export async function createWarehouse(req, res) {
       width,
       height,
       totalArea,
-      totalCapacity,
+      usableArea,
     ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapWarehouseRow(rows[0]));
@@ -303,7 +303,7 @@ export async function updateWarehouse(req, res) {
       'length',
       'width',
       'height',
-      'totalCapacity',
+      'usableArea',
       'isActive',
     ];
 
