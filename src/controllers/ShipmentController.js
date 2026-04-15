@@ -1,5 +1,9 @@
 import pool from '../config/db.js';
+import { randomUUID } from 'crypto';
 import { tableName as SHIPMENT_TABLE } from '../models/Shipment.js';
+import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
+import { tableName as USER_TABLE } from '../models/User.js';
+import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 
 function mapShipmentRow(row) {
   if (!row) return null;
@@ -22,6 +26,25 @@ function mapShipmentRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function getTenantIdByUserId(userId) {
+  const { rows } = await pool.query(
+    `SELECT tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+    [userId],
+  );
+  return rows[0]?.tenant_id || null;
+}
+
+async function createNotification(client, userId, title, content) {
+  if (!userId) return;
+  await client.query(
+    `
+    INSERT INTO ${NOTIFICATION_TABLE} (notification_id, user_id, type, title, content, is_read)
+    VALUES ($1, $2, 'SHIPMENT_TRACKING', $3, $4, false)
+    `,
+    [randomUUID(), userId, title, content],
+  );
 }
 
 // POST /shipments
@@ -84,6 +107,9 @@ export async function listShipments(req, res) {
   try {
     const { page = 1, limit = 10, contractId, status, shipmentType, providerId } = req.query;
     const offset = (page - 1) * limit;
+    const role = req.user?.role;
+    const userId = req.user?.userId;
+    const tenantId = role === 'tenant_admin' ? await getTenantIdByUserId(userId) : null;
 
     let whereClause = 'WHERE 1=1';
     const filterValues = [];
@@ -109,18 +135,29 @@ export async function listShipments(req, res) {
       filterValues.push(providerId);
       filterParamIndex++;
     }
+    if (tenantId) {
+      whereClause += ` AND c.tenant_id = $${filterParamIndex}`;
+      filterValues.push(tenantId);
+      filterParamIndex++;
+    }
 
     const values = [...filterValues, limit, offset];
     const query = `
       SELECT s.*
       FROM ${SHIPMENT_TABLE} s
+      JOIN ${CONTRACT_TABLE} c ON c.contract_id = s.contract_id
       ${whereClause}
       ORDER BY s.created_at DESC
       LIMIT $${filterParamIndex} OFFSET $${filterParamIndex + 1};
     `;
     const { rows } = await pool.query(query, values);
 
-    const countQuery = `SELECT COUNT(*) as total FROM ${SHIPMENT_TABLE} s ${whereClause};`;
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM ${SHIPMENT_TABLE} s
+      JOIN ${CONTRACT_TABLE} c ON c.contract_id = s.contract_id
+      ${whereClause};
+    `;
     const { rows: countRows } = await pool.query(countQuery, filterValues);
 
     return res.json({
@@ -142,8 +179,20 @@ export async function listShipments(req, res) {
 export async function getShipmentById(req, res) {
   try {
     const { id } = req.params;
-    const query = `SELECT * FROM ${SHIPMENT_TABLE} WHERE shipment_id = $1 LIMIT 1;`;
+    const role = req.user?.role;
+    const userId = req.user?.userId;
+    const tenantId = role === 'tenant_admin' ? await getTenantIdByUserId(userId) : null;
+    const query = `
+      SELECT s.*, c.tenant_id as contract_tenant_id
+      FROM ${SHIPMENT_TABLE} s
+      JOIN ${CONTRACT_TABLE} c ON c.contract_id = s.contract_id
+      WHERE s.shipment_id = $1
+      LIMIT 1;
+    `;
     const { rows } = await pool.query(query, [id]);
+    if (tenantId && rows[0]?.contract_tenant_id !== tenantId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
     const shipment = mapShipmentRow(rows[0]);
     if (!shipment) {
       return res.status(404).json({ message: 'Shipment không tồn tại' });
@@ -157,6 +206,7 @@ export async function getShipmentById(req, res) {
 
 // PATCH /shipments/:id
 export async function updateShipment(req, res) {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const updates = { ...req.body };
@@ -170,6 +220,15 @@ export async function updateShipment(req, res) {
       'fromAddress', 'toAddress', 'scheduledTime', 'actualStartTime', 'actualEndTime',
       'totalWeight', 'totalDistance', 'shippingFee', 'status',
     ];
+
+    const { rows: currentRows } = await client.query(
+      `SELECT * FROM ${SHIPMENT_TABLE} WHERE shipment_id = $1 LIMIT 1`,
+      [id],
+    );
+    const current = currentRows[0];
+    if (!current) {
+      return res.status(404).json({ message: 'Shipment không tồn tại' });
+    }
 
     const fields = [];
     const values = [];
@@ -194,15 +253,53 @@ export async function updateShipment(req, res) {
       WHERE shipment_id = $${paramIndex}
       RETURNING *;
     `;
-    const { rows } = await pool.query(query, values);
+    const { rows } = await client.query(query, values);
     const shipment = mapShipmentRow(rows[0]);
     if (!shipment) {
       return res.status(404).json({ message: 'Shipment không tồn tại' });
     }
+
+    const hasTrackingChange =
+      updates.status !== undefined ||
+      updates.scheduledTime !== undefined ||
+      updates.actualStartTime !== undefined ||
+      updates.actualEndTime !== undefined;
+    const hasDriverAssignment = updates.driverId !== undefined && updates.driverId !== current.driver_id;
+
+    if (hasTrackingChange || hasDriverAssignment) {
+      const { rows: tenantUserRows } = await client.query(
+        `
+        SELECT u.user_id
+        FROM ${CONTRACT_TABLE} c
+        JOIN ${USER_TABLE} u ON u.tenant_id = c.tenant_id AND u.role = 'tenant_admin'
+        WHERE c.contract_id = $1
+        `,
+        [shipment.contractId],
+      );
+      for (const row of tenantUserRows) {
+        await createNotification(
+          client,
+          row.user_id,
+          'Cap nhat tien do van chuyen',
+          `Shipment ${shipment.shipmentId} da duoc cap nhat. Trang thai moi: ${shipment.status}.`,
+        );
+      }
+      if (hasDriverAssignment && updates.driverId) {
+        await createNotification(
+          client,
+          updates.driverId,
+          'Ban duoc phan cong van chuyen',
+          `Ban duoc phan cong cho shipment ${shipment.shipmentId}.`,
+        );
+      }
+    }
+
     return res.json(shipment);
   } catch (error) {
     console.error('Error updating shipment:', error);
     return res.status(500).json({ message: 'Lỗi server' });
+  } finally {
+    client.release();
   }
 }
 
