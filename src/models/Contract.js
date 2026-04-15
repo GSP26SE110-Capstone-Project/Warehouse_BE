@@ -57,10 +57,37 @@ export const contractSchema = {
     required: true,
     note: 'Tổng tiền thuê kho',
   },
+  contractFileUrl: {
+    type: 'string',
+    required: false,
+    maxLength: 1000,
+    note: 'Link file hop dong gui cho tenant',
+  },
+  sentAt: {
+    type: 'datetime',
+    required: false,
+    note: 'Thoi diem admin gui hop dong cho tenant',
+  },
+  tenantSignedAt: {
+    type: 'datetime',
+    required: false,
+    note: 'Thoi diem tenant ky hop dong',
+  },
+  signedBy: {
+    type: 'string',
+    required: false,
+    foreignKey: 'user_id',
+    note: 'User tenant ky hop dong',
+  },
+  signatureMethod: {
+    type: 'enum',
+    enum: ['E_SIGN', 'CONFIRM'],
+    required: false,
+  },
   status: {
     type: 'enum',
-    enum: ['ACTIVE', 'EXPIRED', 'CANCELLED'],
-    default: 'ACTIVE',
+    enum: ['DRAFT', 'SENT_TO_TENANT', 'SIGNED_BY_TENANT', 'ACTIVE', 'EXPIRED', 'CANCELLED'],
+    default: 'DRAFT',
   },
   createdAt: {
     type: 'datetime',

@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     email VARCHAR(255) NOT NULL UNIQUE,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'warehouse_manager', 'warehouse_staff', 'transport_staff', 'tenant_admin')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'warehouse_staff', 'transport_staff', 'tenant_admin')),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -159,14 +159,30 @@ CREATE TABLE IF NOT EXISTS slots (
 
 CREATE TABLE IF NOT EXISTS rental_requests (
     request_id VARCHAR(50) PRIMARY KEY,
-    tenant_id VARCHAR(50) NOT NULL,
+    customer_type VARCHAR(20) NOT NULL CHECK (customer_type IN ('individual', 'business')),
+    tenant_id VARCHAR(50),
+    contact_name VARCHAR(255) NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+    contact_email VARCHAR(255) NOT NULL,
+    warehouse_id VARCHAR(50) NOT NULL,
+    storage_type VARCHAR(20) NOT NULL DEFAULT 'normal' CHECK (storage_type IN ('normal')),
     status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
     requested_start_date DATE NOT NULL,
-    duration_days INTEGER NOT NULL,
+    rental_term_unit VARCHAR(20) NOT NULL CHECK (rental_term_unit IN ('MONTH', 'QUARTER', 'YEAR')),
+    rental_term_value INTEGER NOT NULL CHECK (rental_term_value > 0),
+    duration_days INTEGER NOT NULL CHECK (duration_days > 0),
+    goods_type VARCHAR(255) NOT NULL,
+    goods_description TEXT,
+    goods_quantity DECIMAL(15, 2) NOT NULL CHECK (goods_quantity > 0),
+    goods_weight_kg DECIMAL(15, 2) NOT NULL CHECK (goods_weight_kg >= 0),
     notes TEXT,
+    approved_by VARCHAR(50),
+    rejected_reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
+    FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE SET NULL,
+    FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS contracts (
@@ -180,12 +196,18 @@ CREATE TABLE IF NOT EXISTS contracts (
     billing_cycle VARCHAR(50) CHECK (billing_cycle IN ('QUARTER', 'MONTH', 'YEAR', 'CUSTOM')),
     rental_duration_days INTEGER,
     total_rental_fee DECIMAL(15, 2) NOT NULL,
-    status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXPIRED', 'CANCELLED')),
+    contract_file_url TEXT,
+    sent_at TIMESTAMP,
+    tenant_signed_at TIMESTAMP,
+    signed_by VARCHAR(50),
+    signature_method VARCHAR(20) CHECK (signature_method IN ('E_SIGN', 'CONFIRM')),
+    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SENT_TO_TENANT', 'SIGNED_BY_TENANT', 'ACTIVE', 'EXPIRED', 'CANCELLED')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (request_id) REFERENCES rental_requests(request_id) ON DELETE SET NULL,
     FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
-    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL
+    FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (signed_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS contract_items (

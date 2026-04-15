@@ -6,24 +6,32 @@ import {
   getContractById,
   updateContract,
   deleteContract,
+  sendContractToTenant,
+  signContractByTenant,
 } from '../controllers/ContractController.js';
 
 const router = express.Router();
 
 // Danh sách contracts
-router.get('/', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin'), listContracts);
+router.get('/', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse_staff', 'transport_staff'), listContracts);
 
 // Tạo contract mới
-router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager'), createContract);
+router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createContract);
 
 // Chi tiết contract
-router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_manager', 'tenant_admin'), getContractById);
+router.get('/:id', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse_staff', 'transport_staff'), getContractById);
 
 // Cập nhật contract
-router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), updateContract);
+router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), updateContract);
+
+// Gui hop dong cho tenant
+router.post('/:id/send', requireAuth, requireRoles('admin', 'warehouse_staff'), sendContractToTenant);
+
+// Tenant ky hop dong
+router.post('/:id/sign', requireAuth, requireRoles('tenant_admin'), signContractByTenant);
 
 // Hủy contract (soft delete)
-router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), deleteContract);
+router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), deleteContract);
 
 export default router;
 

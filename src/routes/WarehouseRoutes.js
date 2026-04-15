@@ -15,16 +15,16 @@ const router = express.Router();
 router.get('/', listWarehouses);
 
 // Tạo warehouse
-router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager'), createWarehouse);
+router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createWarehouse);
 
 // Lấy chi tiết warehouse
 router.get('/:id', getWarehouseById);
 
 // Cập nhật warehouse
-router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), updateWarehouse);
+router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), updateWarehouse);
 
 // Xóa warehouse (soft delete)
-router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), deleteWarehouse);
+router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), deleteWarehouse);
 
 // Lấy zones trong warehouse
 router.get('/:id/zones', getWarehouseZones);

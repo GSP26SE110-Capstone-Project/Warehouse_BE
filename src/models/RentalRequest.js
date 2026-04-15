@@ -8,11 +8,45 @@ export const rentalRequestSchema = {
     type: 'string',
     primaryKey: true,
   },
+  customerType: {
+    type: 'enum',
+    enum: ['individual', 'business'],
+    required: true,
+    note: 'Loại khách hàng đăng ký thuê kho',
+  },
   tenantId: {
     type: 'string',
-    required: true,
+    required: false,
     foreignKey: 'tenant_id',
-    note: 'ref Tenant.tenant_id - Công ty muốn thuê',
+    note: 'ref Tenant.tenant_id - Bắt buộc nếu customerType = business',
+  },
+  contactName: {
+    type: 'string',
+    required: true,
+    maxLength: 255,
+    note: 'Người liên hệ đại diện cho đơn đăng ký',
+  },
+  contactPhone: {
+    type: 'string',
+    required: true,
+    maxLength: 20,
+  },
+  contactEmail: {
+    type: 'string',
+    required: true,
+    maxLength: 255,
+  },
+  warehouseId: {
+    type: 'string',
+    required: true,
+    foreignKey: 'warehouse_id',
+    note: 'Kho mà khách hàng muốn thuê',
+  },
+  storageType: {
+    type: 'enum',
+    enum: ['normal'],
+    default: 'normal',
+    note: 'Hiện tại chỉ hỗ trợ kho thường',
   },
   status: {
     type: 'enum',
@@ -24,10 +58,39 @@ export const rentalRequestSchema = {
     required: true,
     note: 'Ngày bắt đầu thuê dự kiến',
   },
-  durationDays: {
+  rentalTermUnit: {
+    type: 'enum',
+    enum: ['MONTH', 'QUARTER', 'YEAR'],
+    required: true,
+    note: 'Kỳ hạn thuê theo nghiệp vụ',
+  },
+  rentalTermValue: {
     type: 'integer',
     required: true,
-    note: 'Số ngày muốn thuê (ít nhất 15 ngày)',
+    note: 'Số kỳ thuê, ví dụ 3 MONTH hoặc 1 YEAR',
+  },
+  durationDays: {
+    type: 'integer',
+    required: false,
+    note: 'Số ngày quy đổi nội bộ từ rentalTermUnit + rentalTermValue',
+  },
+  goodsType: {
+    type: 'string',
+    required: true,
+    maxLength: 255,
+  },
+  goodsDescription: {
+    type: 'text',
+    required: false,
+  },
+  goodsQuantity: {
+    type: 'number',
+    required: true,
+  },
+  goodsWeightKg: {
+    type: 'number',
+    required: true,
+    note: 'Tổng trọng lượng hàng hóa (kg)',
   },
   notes: {
     type: 'text',

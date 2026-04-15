@@ -47,7 +47,7 @@ router.get('/', listZones);
  *       201:
  *         description: Zone created
  */
-router.post('/', requireAuth, requireRoles('admin', 'warehouse_manager'), createZone);
+router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createZone);
 
 /**
  * @swagger
@@ -85,7 +85,7 @@ router.get('/:id', getZoneById);
  *       200:
  *         description: Zone updated
  */
-router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), updateZone);
+router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), updateZone);
 
 /**
  * @swagger
@@ -105,7 +105,7 @@ router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), up
  *       200:
  *         description: Zone deleted
  */
-router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_manager'), deleteZone);
+router.delete('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), deleteZone);
 
 export default router;
 
