@@ -598,7 +598,99 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `message: string`
 
-## 11) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 11) Import/Export Records (Model: `ImportExportRecord`)
+
+### `POST /api/import-export-records`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Request body** — `recordId`, `contractId`, `warehouseId`, `recordType`, `recordCode`, `scheduledDatetime` bắt buộc
+- **Rule theo `scopeType`**
+  - `WAREHOUSE` -> không bắt buộc `zoneId`/`slotId`
+  - `ZONE` -> bắt buộc `zoneId`
+  - `SLOT` -> bắt buộc `slotId`
+
+```json
+{
+  "recordId": "ier-001",
+  "contractId": "contract-001",
+  "warehouseId": "wh-001",
+  "scopeType": "ZONE",
+  "zoneId": "zone-001",
+  "recordType": "IMPORT",
+  "recordCode": "IER-2026-0001",
+  "scheduledDatetime": "2026-06-10T08:00:00.000Z",
+  "quantity": 120,
+  "weight": 1500,
+  "isFullZone": false,
+  "responsibleStaffId": "user-wh-staff-001",
+  "status": "PENDING",
+  "notes": "Nhap dot 1"
+}
+```
+
+- **Response `201`**
+  - `ImportExportRecordResponse`
+
+### `GET /api/import-export-records`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Query** — optional: `page`, `limit`, `contractId`, `warehouseId`, `recordType`, `status`, `scopeType`, `scheduledFrom`, `scheduledTo`, `search`
+- **Response `200`**
+  - `records: array<ImportExportRecordResponse>`
+  - `pagination: PaginationResponse`
+
+### `GET /api/import-export-records/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Path** — `id`
+- **Response `200`**
+  - `ImportExportRecordResponse`
+
+### `PATCH /api/import-export-records/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Request body** — update field động (trừ `recordId`, `createdAt`, `updatedAt`), vẫn enforce rule theo `scopeType`
+- **Response `200`**
+  - `ImportExportRecordResponse`
+
+### `DELETE /api/import-export-records/{id}`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager`
+- **Path** — `id`
+- **Hành vi** — soft delete/hủy phiếu (`status = CANCELLED`)
+- **Response `200`**
+  - `message: string`
+  - `record: ImportExportRecordResponse`
+
+### `POST /api/import-export-reports`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_manager` hoặc `warehouse_staff`
+- **Mục đích** — Tạo báo cáo xuất nhập theo kỳ (tổng hợp từ `import_export_records`), trả JSON; **không** lưu bản ghi báo cáo vào database.
+- **Request body** — `from`, `to` bắt buộc (ISO datetime); các field còn lại tùy chọn
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `basis` | `scheduled` (mặc định) — lọc theo `scheduled_datetime`; `actual` — lọc theo `actual_datetime` (bỏ qua bản ghi chưa có thời điểm thực tế) |
+| `warehouseId`, `contractId`, `tenantId`, `recordType`, `status` | Lọc thêm |
+| `includeDetails` | `true`/`false` (mặc định `true`) |
+| `detailsLimit` | Số dòng chi tiết tối đa (1–2000, mặc định 200) |
+
+```json
+{
+  "from": "2026-01-01T00:00:00.000Z",
+  "to": "2026-06-30T23:59:59.999Z",
+  "basis": "scheduled",
+  "warehouseId": "wh-001",
+  "tenantId": null,
+  "includeDetails": true,
+  "detailsLimit": 200
+}
+```
+
+- **Response `201`**
+  - `reportId: string` (UUID sinh tại thời điểm gọi)
+  - `generatedAt: datetime`
+  - `period`, `filters`
+  - `summary` — `totalRecords`, `byRecordType` (IMPORT/EXPORT: count, totalQuantity, totalWeight), `byStatus`, `byWarehouse`
+  - `details: array<object>` — danh sách rút gọn (có `tenantId` join từ hợp đồng)
+  - `detailsTruncated: boolean` — `true` nếu tổng bản ghi vượt quá số dòng trả về
+
+## 12) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
 - **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
@@ -843,6 +935,33 @@ Swagger UI: cùng host + `/api-docs`
 }
 ```
 
+### `ImportExportRecordResponse`
+```json
+{
+  "recordId": "string",
+  "contractId": "string",
+  "warehouseId": "string",
+  "scopeType": "WAREHOUSE | ZONE | SLOT",
+  "zoneId": "string | null",
+  "slotId": "string | null",
+  "recordType": "IMPORT | EXPORT",
+  "recordCode": "string",
+  "scheduledDatetime": "datetime",
+  "actualDatetime": "datetime | null",
+  "quantity": "number | null",
+  "weight": "number | null",
+  "isFullZone": "boolean",
+  "responsibleStaffId": "string | null",
+  "approvedBy": "string | null",
+  "approvedAt": "datetime | null",
+  "status": "PENDING | APPROVED | COMPLETED | CANCELLED",
+  "cancelReason": "string | null",
+  "notes": "string | null",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
 ### `PaginationResponse`
 ```json
 {
@@ -859,19 +978,14 @@ Hiện trong `src/models` có một số model chưa được expose endpoint tr
 
 - `Promotion`
 - `Level`
-- `ContractItem`
 - `Invoice`
-- `Contract`
 - `PricingRule`
 - `Branch`
 - `Payment`
 - `QrTag`
 - `Notification`
 - `AuditLog`
-- `Shipment`
 - `Rack`
-- `TransportStation`
 - `Slot`
-- `TransportationProvider`
 
 Nếu bạn muốn, mình có thể tạo tiếp tài liệu phase 2: đề xuất CRUD endpoint chuẩn REST cho nhóm model này luôn.
