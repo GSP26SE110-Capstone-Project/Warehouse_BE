@@ -101,7 +101,7 @@ export async function createZone(req, res) {
 
     // Kiểm tra kho tồn tại để trả lỗi rõ ràng trước khi chạm FK ở DB
     const warehouseCheck = await pool.query(
-      `SELECT 1 FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1 LIMIT 1;`,
+      `SELECT total_area FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1 LIMIT 1;`,
       [warehouseId]
     );
     if (warehouseCheck.rows.length === 0) {
@@ -109,6 +109,25 @@ export async function createZone(req, res) {
     }
 
     const totalArea = Number(length) * Number(width);
+    if (Number.isNaN(totalArea)) {
+      return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+    }
+
+    const warehouseTotalArea = Number(warehouseCheck.rows[0].total_area ?? 0);
+    const usedAreaQuery = `
+      SELECT COALESCE(SUM(total_area), 0) AS used_area
+      FROM ${ZONE_TABLE}
+      WHERE warehouse_id = $1;
+    `;
+    const { rows: usedAreaRows } = await pool.query(usedAreaQuery, [warehouseId]);
+    const usedArea = Number(usedAreaRows[0]?.used_area ?? 0);
+    const nextUsedArea = usedArea + totalArea;
+    if (nextUsedArea > warehouseTotalArea) {
+      const remainingArea = Math.max(warehouseTotalArea - usedArea, 0);
+      return res.status(400).json({
+        message: `Không thể tạo zone: diện tích còn lại của kho là ${remainingArea} m², nhưng zone mới cần ${totalArea} m²`,
+      });
+    }
 
     const conflictQuery = `
       SELECT zone_id, warehouse_id, zone_code
