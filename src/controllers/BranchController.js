@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as BRANCH_TABLE } from '../models/Branch.js';
+import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapBranchRow(row) {
@@ -46,15 +47,29 @@ export async function createBranch(req, res) {
       return res.status(400).json({ message: `Thiếu các field bắt buộc: ${missing.join(', ')}` });
     }
 
+    if (managerId) {
+      const managerCheck = await pool.query(
+        `SELECT 1 FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1;`,
+        [managerId]
+      );
+      if (managerCheck.rows.length === 0) {
+        return res.status(400).json({ message: 'managerId không tồn tại trong hệ thống' });
+      }
+    }
+
     const conflictQuery = `
-      SELECT 1
+      SELECT branch_id, branch_code
       FROM ${BRANCH_TABLE}
       WHERE branch_id = $1 OR branch_code = $2
       LIMIT 1;
     `;
     const { rows: conflictRows } = await pool.query(conflictQuery, [branchId, branchCode]);
     if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'branchId hoặc branchCode đã tồn tại' });
+      const existing = conflictRows[0];
+      if (existing.branch_id === branchId) {
+        return res.status(409).json({ message: 'branchId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `branchCode "${branchCode}" đã tồn tại` });
     }
 
     const query = `
@@ -69,6 +84,9 @@ export async function createBranch(req, res) {
     return res.status(201).json(mapBranchRow(rows[0]));
   } catch (error) {
     console.error('Error creating branch:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo branch: managerId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

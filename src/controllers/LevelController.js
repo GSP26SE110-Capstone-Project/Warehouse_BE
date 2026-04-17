@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as LEVEL_TABLE } from '../models/Level.js';
+import { tableName as RACK_TABLE } from '../models/Rack.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapLevelRow(row) {
@@ -42,15 +43,27 @@ export async function createLevel(req, res) {
       return res.status(400).json({ message: `Thiếu các field bắt buộc: ${missing.join(', ')}` });
     }
 
+    const rackCheck = await pool.query(
+      `SELECT 1 FROM ${RACK_TABLE} WHERE rack_id = $1 LIMIT 1;`,
+      [rackId]
+    );
+    if (rackCheck.rows.length === 0) {
+      return res.status(400).json({ message: 'rackId không tồn tại trong hệ thống' });
+    }
+
     const conflictQuery = `
-      SELECT 1
+      SELECT level_id, rack_id, level_number
       FROM ${LEVEL_TABLE}
       WHERE level_id = $1 OR (rack_id = $2 AND level_number = $3)
       LIMIT 1;
     `;
     const { rows: conflictRows } = await pool.query(conflictQuery, [levelId, rackId, levelNumber]);
     if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'levelId hoặc levelNumber đã tồn tại trong rack' });
+      const existing = conflictRows[0];
+      if (existing.level_id === levelId) {
+        return res.status(409).json({ message: 'levelId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `levelNumber "${levelNumber}" đã tồn tại trong rack "${rackId}"` });
     }
 
     const query = `
@@ -65,6 +78,9 @@ export async function createLevel(req, res) {
     return res.status(201).json(mapLevelRow(rows[0]));
   } catch (error) {
     console.error('Error creating level:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo level: rackId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }
