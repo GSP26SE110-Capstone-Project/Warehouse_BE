@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as RACK_TABLE } from '../models/Rack.js';
+import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapRackRow(row) {
@@ -48,15 +49,27 @@ export async function createRack(req, res) {
       return res.status(400).json({ message: `Thiếu các field bắt buộc: ${missing.join(', ')}` });
     }
 
+    const zoneCheck = await pool.query(
+      `SELECT 1 FROM ${ZONE_TABLE} WHERE zone_id = $1 LIMIT 1;`,
+      [zoneId]
+    );
+    if (zoneCheck.rows.length === 0) {
+      return res.status(400).json({ message: 'zoneId không tồn tại trong hệ thống' });
+    }
+
     const conflictQuery = `
-      SELECT 1
+      SELECT rack_id, zone_id, rack_code
       FROM ${RACK_TABLE}
       WHERE rack_id = $1 OR (zone_id = $2 AND rack_code = $3)
       LIMIT 1;
     `;
     const { rows: conflictRows } = await pool.query(conflictQuery, [rackId, zoneId, rackCode]);
     if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'rackId hoặc rackCode đã tồn tại trong zone' });
+      const existing = conflictRows[0];
+      if (existing.rack_id === rackId) {
+        return res.status(409).json({ message: 'rackId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `rackCode "${rackCode}" đã tồn tại trong zone "${zoneId}"` });
     }
 
     const query = `
@@ -71,6 +84,9 @@ export async function createRack(req, res) {
     return res.status(201).json(mapRackRow(rows[0]));
   } catch (error) {
     console.error('Error creating rack:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo rack: zoneId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

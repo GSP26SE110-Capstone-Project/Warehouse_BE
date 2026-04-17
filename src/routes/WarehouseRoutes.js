@@ -39,6 +39,13 @@ const router = express.Router();
  *         name: search
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: vacant
+ *         schema:
+ *           type: boolean
+ *         description: >
+ *           true = chỉ các kho đang không có hợp đồng ACTIVE nào (thuê cả kho, zone hoặc slot trong kho).
+ *           Dùng để liệt kê kho còn trống cho tenant mới.
  *     responses:
  *       200:
  *         description: Warehouse list

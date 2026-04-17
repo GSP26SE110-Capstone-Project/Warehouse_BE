@@ -1,6 +1,13 @@
 import pool from '../config/db.js';
 import { tableName as WAREHOUSE_TABLE } from '../models/Warehouse.js';
 import { tableName as USER_TABLE } from '../models/User.js';
+import { tableName as BRANCH_TABLE } from '../models/Branch.js';
+import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
+import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
+import { tableName as ZONE_TABLE } from '../models/Zone.js';
+import { tableName as SLOT_TABLE } from '../models/Slot.js';
+import { tableName as LEVEL_TABLE } from '../models/Level.js';
+import { tableName as RACK_TABLE } from '../models/Rack.js';
 
 // Map DB row -> domain object
 function mapWarehouseRow(row) {
@@ -130,20 +137,42 @@ export async function createWarehouse(req, res) {
       });
     }
 
+    const branchCheck = await pool.query(
+      `SELECT 1 FROM ${BRANCH_TABLE} WHERE branch_id = $1 LIMIT 1;`,
+      [branchId]
+    );
+    if (branchCheck.rows.length === 0) {
+      return res.status(400).json({ message: 'branchId không tồn tại trong hệ thống' });
+    }
+
+    if (managerId) {
+      const managerCheck = await pool.query(
+        `SELECT 1 FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1;`,
+        [managerId]
+      );
+      if (managerCheck.rows.length === 0) {
+        return res.status(400).json({ message: 'managerId không tồn tại trong hệ thống' });
+      }
+    }
+
     const totalArea = Number(length) * Number(width);
     if (Number.isNaN(totalArea)) {
       return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
     }
 
     const conflictQuery = `
-      SELECT 1
+      SELECT warehouse_id, warehouse_code
       FROM ${WAREHOUSE_TABLE}
       WHERE warehouse_id = $1 OR warehouse_code = $2
       LIMIT 1;
     `;
     const { rows: conflictRows } = await pool.query(conflictQuery, [warehouseId, warehouseCode]);
     if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'warehouseId hoặc warehouseCode đã tồn tại' });
+      const existing = conflictRows[0];
+      if (existing.warehouse_id === warehouseId) {
+        return res.status(409).json({ message: 'warehouseId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `warehouseCode "${warehouseCode}" đã tồn tại` });
     }
 
     const query = `
@@ -191,19 +220,46 @@ export async function createWarehouse(req, res) {
     return res.status(201).json(mapWarehouseRow(rows[0]));
   } catch (error) {
     console.error('Error creating warehouse:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo warehouse: branchId hoặc managerId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }
 
 // GET /warehouses - Danh sách warehouses (public cho tenant)
+// Query vacant=true: kho chưa có hợp đồng ACTIVE (không thuê toàn kho / zone / slot nào trong kho)
 export async function listWarehouses(req, res) {
   try {
-    const { page = 1, limit = 10, city, warehouseType, search } = req.query;
+    const { page = 1, limit = 10, city, warehouseType, search, vacant } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE w.is_active = true';
     const filterValues = [];
     let filterParamIndex = 1;
+
+    if (vacant === 'true' || vacant === true) {
+      whereClause += `
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ${CONTRACT_ITEM_TABLE} ci
+          INNER JOIN ${CONTRACT_TABLE} c ON c.contract_id = ci.contract_id AND c.status = 'ACTIVE'
+          WHERE (
+            (ci.rent_type = 'ENTIRE_WAREHOUSE' AND ci.warehouse_id = w.warehouse_id)
+            OR (ci.rent_type = 'ZONE' AND ci.zone_id IN (
+              SELECT z2.zone_id FROM ${ZONE_TABLE} z2 WHERE z2.warehouse_id = w.warehouse_id
+            ))
+            OR (ci.rent_type = 'SLOT' AND ci.slot_id IN (
+              SELECT s.slot_id
+              FROM ${SLOT_TABLE} s
+              INNER JOIN ${LEVEL_TABLE} l ON l.level_id = s.level_id
+              INNER JOIN ${RACK_TABLE} r ON r.rack_id = l.rack_id
+              INNER JOIN ${ZONE_TABLE} z3 ON z3.zone_id = r.zone_id
+              WHERE z3.warehouse_id = w.warehouse_id
+            ))
+          )
+        )`;
+    }
 
     if (city) {
       whereClause += ` AND w.city = $${filterParamIndex}`;

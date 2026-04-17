@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as SLOT_TABLE } from '../models/Slot.js';
+import { tableName as LEVEL_TABLE } from '../models/Level.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapSlotRow(row) {
@@ -52,15 +53,27 @@ export async function createSlot(req, res) {
       return res.status(400).json({ message: 'length, width, height phải là số hợp lệ' });
     }
 
+    const levelCheck = await pool.query(
+      `SELECT 1 FROM ${LEVEL_TABLE} WHERE level_id = $1 LIMIT 1;`,
+      [levelId]
+    );
+    if (levelCheck.rows.length === 0) {
+      return res.status(400).json({ message: 'levelId không tồn tại trong hệ thống' });
+    }
+
     const conflictQuery = `
-      SELECT 1
+      SELECT slot_id, slot_code
       FROM ${SLOT_TABLE}
       WHERE slot_id = $1 OR slot_code = $2
       LIMIT 1;
     `;
     const { rows: conflictRows } = await pool.query(conflictQuery, [slotId, slotCode]);
     if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'slotId hoặc slotCode đã tồn tại' });
+      const existing = conflictRows[0];
+      if (existing.slot_id === slotId) {
+        return res.status(409).json({ message: 'slotId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `slotCode "${slotCode}" đã tồn tại` });
     }
 
     const query = `
@@ -75,6 +88,9 @@ export async function createSlot(req, res) {
     return res.status(201).json(mapSlotRow(rows[0]));
   } catch (error) {
     console.error('Error creating slot:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo slot: levelId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { tableName as ZONE_TABLE } from '../models/Zone.js';
+import { tableName as WAREHOUSE_TABLE } from '../models/Warehouse.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
 function mapZoneRow(row) {
@@ -98,16 +99,49 @@ export async function createZone(req, res) {
       return res.status(400).json({ message: 'warehouseId, zoneCode, length, width là bắt buộc' });
     }
 
+    // Kiểm tra kho tồn tại để trả lỗi rõ ràng trước khi chạm FK ở DB
+    const warehouseCheck = await pool.query(
+      `SELECT total_area FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1 LIMIT 1;`,
+      [warehouseId]
+    );
+    if (warehouseCheck.rows.length === 0) {
+      return res.status(400).json({ message: 'warehouseId không tồn tại trong hệ thống' });
+    }
+
     const totalArea = Number(length) * Number(width);
+    if (Number.isNaN(totalArea)) {
+      return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+    }
+
+    const warehouseTotalArea = Number(warehouseCheck.rows[0].total_area ?? 0);
+    const usedAreaQuery = `
+      SELECT COALESCE(SUM(total_area), 0) AS used_area
+      FROM ${ZONE_TABLE}
+      WHERE warehouse_id = $1;
+    `;
+    const { rows: usedAreaRows } = await pool.query(usedAreaQuery, [warehouseId]);
+    const usedArea = Number(usedAreaRows[0]?.used_area ?? 0);
+    const nextUsedArea = usedArea + totalArea;
+    if (nextUsedArea > warehouseTotalArea) {
+      const remainingArea = Math.max(warehouseTotalArea - usedArea, 0);
+      return res.status(400).json({
+        message: `Không thể tạo zone: diện tích còn lại của kho là ${remainingArea} m², nhưng zone mới cần ${totalArea} m²`,
+      });
+    }
 
     const conflictQuery = `
-      SELECT 1 FROM ${ZONE_TABLE}
+      SELECT zone_id, warehouse_id, zone_code
+      FROM ${ZONE_TABLE}
       WHERE zone_id = $1 OR (warehouse_id = $2 AND zone_code = $3)
       LIMIT 1;
     `;
     const { rows: conflict } = await pool.query(conflictQuery, [zoneId, warehouseId, zoneCode]);
     if (conflict.length > 0) {
-      return res.status(409).json({ message: 'zoneId hoặc zoneCode đã tồn tại trong kho' });
+      const existing = conflict[0];
+      if (existing.zone_id === zoneId) {
+        return res.status(409).json({ message: 'zoneId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: `zoneCode "${zoneCode}" đã tồn tại trong kho "${warehouseId}"` });
     }
 
     const insertQuery = `
@@ -122,6 +156,9 @@ export async function createZone(req, res) {
     return res.status(201).json(mapZoneRow(rows[0]));
   } catch (error) {
     console.error('Error creating zone:', error);
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo zone: warehouseId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }
