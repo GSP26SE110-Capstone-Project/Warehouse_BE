@@ -5,6 +5,7 @@ import { generatePrefixedId } from '../utils/idGenerator.js';
 // Map DB row -> domain object (camelCase cho phía API)
 function mapUserRow(row) {
   if (!row) return null;
+  const derivedStatus = row.status ?? (row.is_active === true ? 'active' : 'inactive');
   return {
     userId: row.user_id,
     email: row.email,
@@ -12,7 +13,8 @@ function mapUserRow(row) {
     fullName: row.full_name,
     phone: row.phone,
     role: row.role,
-    status: row.status,
+    status: derivedStatus,
+    isActive: row.is_active ?? derivedStatus === 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -35,6 +37,8 @@ export async function createUser(req, res) {
       prefix: 'USR',
     });
 
+    const isActive = status === 'active';
+
     const query = `
       INSERT INTO ${USER_TABLE} (
         user_id,
@@ -43,13 +47,13 @@ export async function createUser(req, res) {
         full_name,
         phone,
         role,
-        status
+        is_active
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *;
     `;
 
-    const values = [userId, email, passwordHash, fullName, phone, role, status];
+    const values = [userId, email, passwordHash, fullName, phone, role, isActive];
     const { rows } = await pool.query(query, values);
 
     return res.status(201).json(mapUserRow(rows[0]));
@@ -94,9 +98,9 @@ export async function listUsers(req, res) {
     const values = [];
     let index = 1;
 
-    if (status) {
-      whereClauses.push(`status = $${index}`);
-      values.push(status);
+    if (status === 'active' || status === 'inactive') {
+      whereClauses.push(`is_active = $${index}`);
+      values.push(status === 'active');
       index += 1;
     }
 
@@ -131,6 +135,7 @@ export async function updateUser(req, res) {
       phone,
       role,
       status,
+      isActive,
       passwordHash, // đã hash sẵn nếu có đổi mật khẩu
     } = req.body;
 
@@ -139,7 +144,6 @@ export async function updateUser(req, res) {
       fullName: 'full_name',
       phone: 'phone',
       role: 'role',
-      status: 'status',
       passwordHash: 'password_hash',
     };
 
@@ -147,7 +151,7 @@ export async function updateUser(req, res) {
     const values = [];
     let index = 1;
 
-    const fields = { email, fullName, phone, role, status, passwordHash };
+    const fields = { email, fullName, phone, role, passwordHash };
 
     for (const [key, dbColumn] of Object.entries(allowedFieldsMap)) {
       if (fields[key] !== undefined) {
@@ -155,6 +159,19 @@ export async function updateUser(req, res) {
         values.push(fields[key]);
         index += 1;
       }
+    }
+
+    if (isActive !== undefined) {
+      setClauses.push(`is_active = $${index}`);
+      values.push(Boolean(isActive));
+      index += 1;
+    } else if (status !== undefined) {
+      if (status !== 'active' && status !== 'inactive') {
+        return res.status(400).json({ message: 'status must be "active" or "inactive"' });
+      }
+      setClauses.push(`is_active = $${index}`);
+      values.push(status === 'active');
+      index += 1;
     }
 
     if (setClauses.length === 0) {
@@ -192,7 +209,7 @@ export async function deleteUser(req, res) {
 
     const query = `
       UPDATE ${USER_TABLE}
-      SET status = 'inactive', updated_at = NOW()
+      SET is_active = false, updated_at = NOW()
       WHERE user_id = $1
       RETURNING *;
     `;

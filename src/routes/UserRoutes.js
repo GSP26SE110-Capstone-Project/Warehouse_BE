@@ -70,7 +70,9 @@ router.get('/:id', getUserById);
  *           type: string
  *     requestBody:
  *       required: false
- *       description: Ít nhất một field (email, fullName, phone, role, status, passwordHash).
+ *       description: |
+ *         Ít nhất một field. Để kích hoạt lại user sau DELETE (soft deactivate), gửi `isActive: true` hoặc `status: "active"`.
+ *         `status` chỉ nhận `active` | `inactive` (ánh xạ sang cột `is_active` trong DB).
  *       content:
  *         application/json:
  *           schema:
@@ -84,8 +86,12 @@ router.get('/:id', getUserById);
  *                 type: string
  *               role:
  *                 type: string
+ *               isActive:
+ *                 type: boolean
+ *                 description: true = kích hoạt, false = vô hiệu (ưu tiên hơn `status` nếu gửi cả hai)
  *               status:
  *                 type: string
+ *                 enum: [active, inactive]
  *               passwordHash:
  *                 type: string
  *                 description: Chuỗi hash mật khẩu (bcrypt) nếu đổi mật khẩu
