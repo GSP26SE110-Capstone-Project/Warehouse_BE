@@ -5,32 +5,75 @@ import { generatePrefixedId } from '../utils/idGenerator.js';
 // Map DB row -> domain object (camelCase cho phía API)
 function mapUserRow(row) {
   if (!row) return null;
+  const derivedStatus = row.status ?? (row.is_active === true ? 'active' : 'inactive');
   return {
     userId: row.user_id,
+    tenantId: row.tenant_id ?? null,
+    branchId: row.branch_id ?? null,
+    username: row.username ?? undefined,
     email: row.email,
     passwordHash: row.password_hash,
     fullName: row.full_name,
     phone: row.phone,
     role: row.role,
-    status: row.status,
+    status: derivedStatus,
+    isActive: row.is_active ?? derivedStatus === 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-// POST /users
+// POST /users — Admin tạo tài khoản tenant_admin (gắn tenant)
 export async function createUser(req, res) {
   try {
     const {
-      userId: incomingUserId = null,
       email,
-      passwordHash, // đã hash sẵn ở middleware/service
+      passwordHash,
       fullName,
+      tenantId,
+      username: usernameBody,
+      branchId = null,
       phone = null,
-      role = 'tenant',
-      status = 'active',
+      isActive = true,
+      status,
     } = req.body;
-    const userId = incomingUserId || await generatePrefixedId(pool, {
+
+    const emailTrim = typeof email === 'string' ? email.trim() : '';
+    const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
+    const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
+    const usernameTrim =
+      typeof usernameBody === 'string' && usernameBody.trim()
+        ? usernameBody.trim()
+        : emailTrim;
+
+    if (!emailTrim || !passwordHash || !fullNameTrim || !tenantIdTrim) {
+      return res.status(400).json({
+        message: 'Thiếu thông tin: email, passwordHash, fullName và tenantId là bắt buộc',
+      });
+    }
+
+    const { rows: tenantRows } = await pool.query(
+      `SELECT 1 FROM tenants WHERE tenant_id = $1 LIMIT 1`,
+      [tenantIdTrim],
+    );
+    if (tenantRows.length === 0) {
+      return res.status(400).json({ message: 'Không tồn tại tenant với tenantId đã gửi' });
+    }
+
+    if (branchId) {
+      const { rows: br } = await pool.query(
+        `SELECT 1 FROM branches WHERE branch_id = $1 LIMIT 1`,
+        [branchId],
+      );
+      if (br.length === 0) {
+        return res.status(400).json({ message: 'Không tồn tại chi nhánh với branchId đã gửi' });
+      }
+    }
+
+    const active =
+      status !== undefined ? status === 'active' : Boolean(isActive);
+
+    const userId = await generatePrefixedId(pool, {
       tableName: USER_TABLE,
       idColumn: 'user_id',
       prefix: 'USR',
@@ -39,22 +82,44 @@ export async function createUser(req, res) {
     const query = `
       INSERT INTO ${USER_TABLE} (
         user_id,
+        tenant_id,
+        branch_id,
+        username,
         email,
         password_hash,
         full_name,
         phone,
         role,
-        status
+        is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *;
     `;
 
-    const values = [userId, email, passwordHash, fullName, phone, role, status];
-    const { rows } = await pool.query(query, values);
+    const values = [
+      userId,
+      tenantIdTrim,
+      branchId || null,
+      usernameTrim,
+      emailTrim,
+      passwordHash,
+      fullNameTrim,
+      phone || null,
+      'tenant_admin',
+      active,
+    ];
 
-    return res.status(201).json(mapUserRow(rows[0]));
+    const { rows } = await pool.query(query, values);
+    const mapped = mapUserRow(rows[0]);
+    delete mapped.passwordHash;
+    return res.status(201).json(mapped);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ message: 'Email hoặc username đã tồn tại' });
+    }
+    if (err.code === '23503') {
+      return res.status(400).json({ message: 'Dữ liệu tham chiếu không hợp lệ (tenant/branch)' });
+    }
     console.error('Error creating user:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
@@ -95,9 +160,9 @@ export async function listUsers(req, res) {
     const values = [];
     let index = 1;
 
-    if (status) {
-      whereClauses.push(`status = $${index}`);
-      values.push(status);
+    if (status === 'active' || status === 'inactive') {
+      whereClauses.push(`is_active = $${index}`);
+      values.push(status === 'active');
       index += 1;
     }
 
@@ -132,6 +197,7 @@ export async function updateUser(req, res) {
       phone,
       role,
       status,
+      isActive,
       passwordHash, // đã hash sẵn nếu có đổi mật khẩu
     } = req.body;
 
@@ -140,7 +206,6 @@ export async function updateUser(req, res) {
       fullName: 'full_name',
       phone: 'phone',
       role: 'role',
-      status: 'status',
       passwordHash: 'password_hash',
     };
 
@@ -148,7 +213,7 @@ export async function updateUser(req, res) {
     const values = [];
     let index = 1;
 
-    const fields = { email, fullName, phone, role, status, passwordHash };
+    const fields = { email, fullName, phone, role, passwordHash };
 
     for (const [key, dbColumn] of Object.entries(allowedFieldsMap)) {
       if (fields[key] !== undefined) {
@@ -156,6 +221,19 @@ export async function updateUser(req, res) {
         values.push(fields[key]);
         index += 1;
       }
+    }
+
+    if (isActive !== undefined) {
+      setClauses.push(`is_active = $${index}`);
+      values.push(Boolean(isActive));
+      index += 1;
+    } else if (status !== undefined) {
+      if (status !== 'active' && status !== 'inactive') {
+        return res.status(400).json({ message: 'status must be "active" or "inactive"' });
+      }
+      setClauses.push(`is_active = $${index}`);
+      values.push(status === 'active');
+      index += 1;
     }
 
     if (setClauses.length === 0) {
@@ -193,7 +271,7 @@ export async function deleteUser(req, res) {
 
     const query = `
       UPDATE ${USER_TABLE}
-      SET status = 'inactive', updated_at = NOW()
+      SET is_active = false, updated_at = NOW()
       WHERE user_id = $1
       RETURNING *;
     `;

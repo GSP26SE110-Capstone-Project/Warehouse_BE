@@ -59,9 +59,6 @@ router.get('/', listBranches);
  *             type: object
  *             required: [branchCode, branchName, address]
  *             properties:
- *               branchId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng BR0001
  *               managerId:
  *                 type: string
  *               branchCode:

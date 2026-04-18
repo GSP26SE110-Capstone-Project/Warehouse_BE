@@ -57,7 +57,6 @@ export async function createShipmentRequest(req, res) {
     }
 
     const {
-      requestId: incomingRequestId = null,
       contractId,
       shipmentType,
       fromAddress,
@@ -65,7 +64,7 @@ export async function createShipmentRequest(req, res) {
       preferredPickupTime = null,
       notes = null,
     } = req.body;
-    const requestId = incomingRequestId || await generatePrefixedId(pool, {
+    const requestId = await generatePrefixedId(pool, {
       tableName: SHIPMENT_REQUEST_TABLE,
       idColumn: 'request_id',
       prefix: 'SRQ',

@@ -69,9 +69,6 @@ router.get('/', listWarehouses);
  *             type: object
  *             required: [warehouseCode, warehouseName, warehouseType, address, length, width, height]
  *             properties:
- *               warehouseId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng WH0001
  *               branchId:
  *                 type: string
  *                 description: Tùy chọn. Nếu không gửi, hệ thống tự suy ra từ managerId hoặc user đăng nhập
@@ -148,11 +145,45 @@ router.get('/:id', getWarehouseById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
+ *       description: Ít nhất một field. Không gửi warehouseId (khóa chính). Khi đổi length hoặc width, totalArea được tính lại.
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               branchId:
+ *                 type: string
+ *               managerId:
+ *                 type: string
+ *               warehouseCode:
+ *                 type: string
+ *               warehouseName:
+ *                 type: string
+ *               warehouseType:
+ *                 type: string
+ *                 enum: [cold_storage, normal_storage]
+ *               warehouseSize:
+ *                 type: string
+ *                 enum: [small, medium, large, extra_large]
+ *               address:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               district:
+ *                 type: string
+ *               operatingHours:
+ *                 type: string
+ *               length:
+ *                 type: number
+ *               width:
+ *                 type: number
+ *               height:
+ *                 type: number
+ *               usableArea:
+ *                 type: number
+ *               isActive:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Warehouse updated

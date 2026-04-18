@@ -7,7 +7,15 @@ import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { tableName as USER_TABLE } from '../models/User.js';
+import { tableName as TENANT_TABLE } from '../models/Tenant.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
+
+function trimTenantId(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return String(value);
+  const t = value.trim();
+  return t === '' ? null : t;
+}
 
 // Map DB row -> domain object
 function mapRentalRequestRow(row) {
@@ -147,60 +155,87 @@ async function createNotifications(client, userIds, { type, title, content }) {
 
 // POST /rental-requests - Tạo rental request mới
 export async function createRentalRequest(req, res) {
+  const {
+    customerType,
+    tenantId,
+    contactName,
+    contactPhone,
+    contactEmail,
+    warehouseId,
+    storageType = 'normal',
+    requestedStartDate,
+    rentalTermUnit,
+    rentalTermValue,
+    goodsType,
+    goodsDescription,
+    goodsQuantity,
+    goodsWeightKg,
+    notes,
+    selectedZones, // array of zoneIds
+  } = req.body;
+
+  const validationError = validateRentalRequestPayload({
+    customerType,
+    tenantId: trimTenantId(tenantId),
+    contactName,
+    contactPhone,
+    contactEmail,
+    warehouseId,
+    storageType,
+    requestedStartDate,
+    rentalTermUnit,
+    rentalTermValue,
+    goodsType,
+    goodsDescription,
+    goodsQuantity,
+    goodsWeightKg,
+  });
+  if (validationError) {
+    return res.status(400).json({ message: validationError });
+  }
+
+  const normalizedCustomerType = String(customerType).toLowerCase();
+  const normalizedStorageType = String(storageType || 'normal').toLowerCase();
+  const normalizedTermUnit = String(rentalTermUnit).toUpperCase();
+  const normalizedTermValue = Number(rentalTermValue);
+  const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
+
+  const tenantIdFromBody = trimTenantId(tenantId);
+  let effectiveTenantId = tenantIdFromBody;
+
+  if (!effectiveTenantId && req.user?.userId) {
+    const { rows: userRows } = await pool.query(
+      `SELECT tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+      [req.user.userId],
+    );
+    effectiveTenantId = userRows[0]?.tenant_id ? String(userRows[0].tenant_id).trim() : null;
+    if (effectiveTenantId === '') effectiveTenantId = null;
+  }
+
+  if (!effectiveTenantId) {
+    return res.status(400).json({
+      message:
+        'Thiếu tenantId. Cột tenant_id trong database là NOT NULL: với customerType = individual hãy gửi tenantId trong body hoặc đăng nhập bằng user đã gắn tenant; với business thì tenantId là bắt buộc trong body.',
+    });
+  }
+
+  const { rows: tenantRows } = await pool.query(
+    `SELECT 1 FROM ${TENANT_TABLE} WHERE tenant_id = $1 LIMIT 1`,
+    [effectiveTenantId],
+  );
+  if (tenantRows.length === 0) {
+    return res.status(400).json({ message: 'tenantId không tồn tại trong hệ thống' });
+  }
+
+  const requestId = await generatePrefixedId(pool, {
+    tableName: RENTAL_REQUEST_TABLE,
+    idColumn: 'request_id',
+    prefix: 'RRQ',
+  });
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    const {
-      requestId: incomingRequestId = null,
-      customerType,
-      tenantId,
-      contactName,
-      contactPhone,
-      contactEmail,
-      warehouseId,
-      storageType = 'normal',
-      requestedStartDate,
-      rentalTermUnit,
-      rentalTermValue,
-      goodsType,
-      goodsDescription,
-      goodsQuantity,
-      goodsWeightKg,
-      notes,
-      selectedZones, // array of zoneIds
-    } = req.body;
-    const requestId = incomingRequestId || await generatePrefixedId(pool, {
-      tableName: RENTAL_REQUEST_TABLE,
-      idColumn: 'request_id',
-      prefix: 'RRQ',
-    });
-
-    const validationError = validateRentalRequestPayload({
-      customerType,
-      tenantId,
-      contactName,
-      contactPhone,
-      contactEmail,
-      warehouseId,
-      storageType,
-      requestedStartDate,
-      rentalTermUnit,
-      rentalTermValue,
-      goodsType,
-      goodsDescription,
-      goodsQuantity,
-      goodsWeightKg,
-    });
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
-    }
-
-    const normalizedCustomerType = String(customerType).toLowerCase();
-    const normalizedStorageType = String(storageType || 'normal').toLowerCase();
-    const normalizedTermUnit = String(rentalTermUnit).toUpperCase();
-    const normalizedTermValue = Number(rentalTermValue);
-    const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
 
     // Tạo rental request
     const requestQuery = `
@@ -231,7 +266,7 @@ export async function createRentalRequest(req, res) {
     const requestValues = [
       requestId,
       normalizedCustomerType,
-      normalizedCustomerType === 'business' ? tenantId : null,
+      effectiveTenantId,
       contactName,
       contactPhone,
       contactEmail,
@@ -308,8 +343,18 @@ export async function createRentalRequest(req, res) {
 
     return res.status(201).json(result);
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // ignore rollback errors
+    }
     console.error('Error creating rental request:', error);
+    if (error.code === '23502') {
+      return res.status(400).json({ message: 'Dữ liệu không hợp lệ: thiếu giá trị bắt buộc (ví dụ tenant_id)' });
+    }
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo rental request: warehouseId hoặc tenantId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   } finally {
     client.release();
@@ -320,23 +365,25 @@ export async function createRentalRequest(req, res) {
 export async function listRentalRequests(req, res) {
   try {
     const { page = 1, limit = 10, status, tenantId } = req.query;
-    const offset = (page - 1) * limit;
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const offset = (pageNum - 1) * limitNum;
 
-    let whereClause = '';
-    let values = [limit, offset];
-    let paramIndex = 3;
-
+    const filterValues = [];
+    const filterParts = [];
     if (status) {
-      whereClause += ` AND rr.status = $${paramIndex}`;
-      values.push(status);
-      paramIndex++;
+      filterParts.push(`rr.status = $${filterValues.length + 1}`);
+      filterValues.push(status);
     }
-
     if (tenantId) {
-      whereClause += ` AND rr.tenant_id = $${paramIndex}`;
-      values.push(tenantId);
-      paramIndex++;
+      filterParts.push(`rr.tenant_id = $${filterValues.length + 1}`);
+      filterValues.push(tenantId);
     }
+    const whereClause = filterParts.length ? ` AND ${filterParts.join(' AND ')}` : '';
+
+    const limPlaceholder = filterValues.length + 1;
+    const offPlaceholder = filterValues.length + 2;
+    const listValues = [...filterValues, limitNum, offset];
 
     const query = `
       SELECT rr.*, t.company_name as tenant_name
@@ -344,28 +391,28 @@ export async function listRentalRequests(req, res) {
       LEFT JOIN tenants t ON rr.tenant_id = t.tenant_id
       WHERE 1=1 ${whereClause}
       ORDER BY rr.created_at DESC
-      LIMIT $1 OFFSET $2;
+      LIMIT $${limPlaceholder} OFFSET $${offPlaceholder};
     `;
 
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, listValues);
     const requests = rows.map(mapRentalRequestRow);
 
-    // Đếm tổng số
+    // Đếm tổng số (cùng điều kiện lọc; placeholder $1..$n khớp filterValues)
     const countQuery = `
       SELECT COUNT(*) as total
       FROM ${RENTAL_REQUEST_TABLE} rr
       WHERE 1=1 ${whereClause};
     `;
-    const countValues = values.slice(2); // Remove limit and offset
-    const { rows: countRows } = await pool.query(countQuery, countValues);
+    const { rows: countRows } = await pool.query(countQuery, filterValues);
 
+    const total = parseInt(countRows[0].total, 10);
     return res.json({
       requests,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countRows[0].total),
-        totalPages: Math.ceil(countRows[0].total / limit),
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 0,
       },
     });
   } catch (error) {

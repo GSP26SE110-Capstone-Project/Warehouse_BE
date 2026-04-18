@@ -8,6 +8,7 @@ import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { tableName as SLOT_TABLE } from '../models/Slot.js';
 import { tableName as LEVEL_TABLE } from '../models/Level.js';
 import { tableName as RACK_TABLE } from '../models/Rack.js';
+import { generatePrefixedId } from '../utils/idGenerator.js';
 
 // Map DB row -> domain object
 function mapWarehouseRow(row) {
@@ -45,21 +46,6 @@ const CREATE_REQUIRED_FIELDS = [
   'height',
 ];
 
-async function generateWarehouseId() {
-  const query = `
-    SELECT warehouse_id
-    FROM ${WAREHOUSE_TABLE}
-    WHERE warehouse_id ~ '^WH[0-9]+$'
-    ORDER BY CAST(SUBSTRING(warehouse_id FROM 3) AS INTEGER) DESC
-    LIMIT 1;
-  `;
-  const { rows } = await pool.query(query);
-  const lastWarehouseId = rows[0]?.warehouse_id;
-  const lastNumber = lastWarehouseId ? Number(lastWarehouseId.slice(2)) : 0;
-  const nextNumber = Number.isNaN(lastNumber) ? 1 : lastNumber + 1;
-  return `WH${String(nextNumber).padStart(4, '0')}`;
-}
-
 async function resolveBranchId({ branchId, managerId, currentUserId }) {
   if (branchId) return branchId;
 
@@ -92,7 +78,6 @@ async function resolveBranchId({ branchId, managerId, currentUserId }) {
 export async function createWarehouse(req, res) {
   try {
     const {
-      warehouseId: incomingWarehouseId = null,
       branchId: incomingBranchId = null,
       managerId = null,
       warehouseCode,
@@ -108,7 +93,11 @@ export async function createWarehouse(req, res) {
       height,
       usableArea = null,
     } = req.body;
-    const warehouseId = incomingWarehouseId || await generateWarehouseId();
+    const warehouseId = await generatePrefixedId(pool, {
+      tableName: WAREHOUSE_TABLE,
+      idColumn: 'warehouse_id',
+      prefix: 'WH',
+    });
     const branchId = await resolveBranchId({
       branchId: incomingBranchId,
       managerId,
@@ -222,6 +211,16 @@ export async function createWarehouse(req, res) {
     console.error('Error creating warehouse:', error);
     if (error.code === '23503') {
       return res.status(400).json({ message: 'Không thể tạo warehouse: branchId hoặc managerId không tồn tại' });
+    }
+    if (error.code === '23505') {
+      const detail = String(error.detail || '');
+      if (detail.includes('warehouse_code')) {
+        return res.status(409).json({ message: 'warehouseCode đã tồn tại' });
+      }
+      if (detail.includes('warehouse_id')) {
+        return res.status(409).json({ message: 'warehouseId đã tồn tại, vui lòng thử lại' });
+      }
+      return res.status(409).json({ message: 'Dữ liệu trùng lặp (ràng buộc unique trên database)' });
     }
     return res.status(500).json({ message: 'Lỗi server' });
   }

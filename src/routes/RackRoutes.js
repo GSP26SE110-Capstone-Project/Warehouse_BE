@@ -116,11 +116,28 @@ router.get('/:id', getRackById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
+ *       description: Ít nhất một field. Không gửi rackId (khóa chính).
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               zoneId:
+ *                 type: string
+ *               rackCode:
+ *                 type: string
+ *               rackSizeType:
+ *                 type: string
+ *                 enum: [small, medium, large]
+ *               length:
+ *                 type: number
+ *               width:
+ *                 type: number
+ *               height:
+ *                 type: number
+ *               maxWeightCapacity:
+ *                 type: number
  *     responses:
  *       200:
  *         description: Rack updated

@@ -102,6 +102,29 @@ router.get('/:id', getZoneById);
  *         schema:
  *           type: string
  *         required: true
+ *     requestBody:
+ *       required: false
+ *       description: Ít nhất một field. Không gửi zoneId (khóa chính). Khi đổi length hoặc width, totalArea được tính lại.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               warehouseId:
+ *                 type: string
+ *               zoneCode:
+ *                 type: string
+ *               zoneName:
+ *                 type: string
+ *               zoneType:
+ *                 type: string
+ *                 enum: [cold_storage, normal_storage]
+ *               length:
+ *                 type: number
+ *               width:
+ *                 type: number
+ *               isRented:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Zone updated

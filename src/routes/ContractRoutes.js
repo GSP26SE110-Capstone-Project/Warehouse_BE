@@ -36,9 +36,74 @@ router.get('/', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse_st
  *     summary: Tạo hợp đồng mới
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - requestId
+ *               - contractCode
+ *               - startDate
+ *               - endDate
+ *               - totalRentalFee
+ *             properties:
+ *               requestId:
+ *                 type: string
+ *                 description: ID rental request (phải tồn tại, status APPROVED, chưa gắn contract khác)
+ *               contractCode:
+ *                 type: string
+ *                 description: Mã hợp đồng (unique)
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *               totalRentalFee:
+ *                 type: number
+ *                 description: Tổng phí thuê
+ *               tenantId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Tùy chọn; nếu bỏ trống lấy từ rental request
+ *               approvedBy:
+ *                 type: string
+ *                 nullable: true
+ *                 description: user_id người duyệt (nếu có)
+ *               billingCycle:
+ *                 type: string
+ *                 enum: [QUARTER, MONTH, YEAR, CUSTOM]
+ *                 nullable: true
+ *               rentalDurationDays:
+ *                 type: integer
+ *                 nullable: true
+ *               status:
+ *                 type: string
+ *                 enum: [DRAFT, SENT_TO_TENANT, CANCELLED]
+ *                 default: DRAFT
+ *                 description: Mặc định DRAFT; chỉ chuyển hợp lệ từ DRAFT khi tạo
+ *           example:
+ *             requestId: RRQ0001
+ *             contractCode: CTR-2026-0001
+ *             startDate: "2026-05-01"
+ *             endDate: "2026-08-01"
+ *             billingCycle: MONTH
+ *             rentalDurationDays: 92
+ *             totalRentalFee: 120000000
+ *             tenantId: TEN0001
+ *             approvedBy: USR0001
+ *             status: DRAFT
  *     responses:
  *       201:
  *         description: Contract created
+ *       400:
+ *         description: Thiếu field / rental request chưa APPROVED / status không hợp lệ
+ *       404:
+ *         description: Rental request không tồn tại
+ *       409:
+ *         description: contractCode trùng hoặc request đã có contract
  */
 router.post('/', requireAuth, requireRoles('admin', 'warehouse_staff'), createContract);
 
@@ -99,9 +164,26 @@ router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), upda
  *         required: true
  *         schema:
  *           type: string
+ *     requestBody:
+ *       required: false
+ *       description: Body tùy chọn. Có thể gửi `contractFileUrl` (URL file hợp đồng PDF…); nếu không gửi hoặc null thì giữ nguyên `contract_file_url` hiện có trên bản ghi.
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               contractFileUrl:
+ *                 type: string
+ *                 format: uri
+ *                 nullable: true
+ *                 description: URL file hợp đồng đính kèm (lưu vào DB trước khi chuyển SENT_TO_TENANT)
+ *           example:
+ *             contractFileUrl: "https://storage.example.com/contracts/CTR-2026-0001.pdf"
  *     responses:
  *       200:
- *         description: Contract sent
+ *         description: Contract sent (status = SENT_TO_TENANT, sent_at set)
+ *       400:
+ *         description: Contract không tồn tại hoặc không ở trạng thái DRAFT
  */
 router.post('/:id/send', requireAuth, requireRoles('admin', 'warehouse_staff'), sendContractToTenant);
 

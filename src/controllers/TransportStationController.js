@@ -19,13 +19,12 @@ function mapTransportStationRow(row) {
 export async function createTransportStation(req, res) {
   try {
     const {
-      stationId: incomingStationId = null,
       providerId,
       stationName,
       address = null,
       managerId = null,
     } = req.body;
-    const stationId = incomingStationId || await generatePrefixedId(pool, {
+    const stationId = await generatePrefixedId(pool, {
       tableName: STATION_TABLE,
       idColumn: 'station_id',
       prefix: 'STN',

@@ -100,11 +100,21 @@ router.get('/:id', getLevelById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
+ *       description: Ít nhất một field. Không gửi levelId (khóa chính).
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               rackId:
+ *                 type: string
+ *               levelNumber:
+ *                 type: integer
+ *               heightClearance:
+ *                 type: number
+ *               maxWeight:
+ *                 type: number
  *     responses:
  *       200:
  *         description: Level updated

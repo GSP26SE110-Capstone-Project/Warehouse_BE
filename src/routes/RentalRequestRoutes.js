@@ -40,9 +40,6 @@ router.use(requireAuth);
  *               - goodsQuantity
  *               - goodsWeightKg
  *             properties:
- *               requestId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng RRQ0001
  *               customerType:
  *                 type: string
  *                 enum: [individual, business]
@@ -161,11 +158,47 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_st
  *         schema:
  *           type: string
  *     requestBody:
- *       required: true
+ *       required: false
+ *       description: Ít nhất một field. Chỉ khi status = PENDING. Không gửi selectedZones (dùng API rental-request-zones). Đổi rentalTermUnit/rentalTermValue sẽ cập nhật durationDays.
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               customerType:
+ *                 type: string
+ *                 enum: [individual, business]
+ *               tenantId:
+ *                 type: string
+ *               contactName:
+ *                 type: string
+ *               contactPhone:
+ *                 type: string
+ *               contactEmail:
+ *                 type: string
+ *               warehouseId:
+ *                 type: string
+ *               storageType:
+ *                 type: string
+ *                 enum: [normal]
+ *               requestedStartDate:
+ *                 type: string
+ *                 format: date
+ *               rentalTermUnit:
+ *                 type: string
+ *                 enum: [MONTH, QUARTER, YEAR]
+ *               rentalTermValue:
+ *                 type: integer
+ *               goodsType:
+ *                 type: string
+ *               goodsDescription:
+ *                 type: string
+ *               goodsQuantity:
+ *                 type: number
+ *               goodsWeightKg:
+ *                 type: number
+ *               notes:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Đã cập nhật

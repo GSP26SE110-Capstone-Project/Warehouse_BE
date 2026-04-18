@@ -13,6 +13,12 @@ Swagger UI: cùng host + `/api-docs`
 - `array<T>`: mảng kiểu `T`
 - `object`: object JSON
 
+## Quy ước `POST` tạo mới (primary key)
+
+- **Không gửi** trong body **khóa chính của đúng entity đang tạo** (vd. `userId` khi tạo user, `tenantId` khi tạo tenant, `warehouseId` khi tạo warehouse, `branchId` khi tạo branch, `zoneId` khi tạo zone, `rackId` / `levelId` / `slotId`, `contractId`, `itemId`, `shipmentId`, `requestId` của rental request hoặc shipment request, `recordId`, `stationId`, `providerId`, …). **Server tự sinh** theo prefix (vd. `USR`, `TEN`, `WH`, `BR`, `ZN`, `RCK`, `LVL`, `SLT`, `CTR`, `ITM`, `SHP`, `SRQ`, `RRQ`, `IER`, `STN`, `TPR`).
+- **Vẫn gửi** các **khóa ngoại** cần để nối sang bảng khác (vd. `warehouseId` khi tạo zone, `zoneId` khi tạo rack, `contractId` khi tạo contract item hoặc shipment request, `branchId` khi tạo warehouse nếu muốn chỉ định chi nhánh — xem từng endpoint).
+- **Ngoại lệ (không phải “tạo entity + sinh PK”)**: auth OTP có thể nhận `userId` | `email` | `phone` để **định danh tài khoản**, không áp dụng quy tắc trên.
+
 ## 1) Auth (User Authentication)
 
 ### `POST /api/auth/register`
@@ -109,11 +115,10 @@ Swagger UI: cùng host + `/api-docs`
 ## 2) Users (Model: `User`)
 
 ### `POST /api/users`
-- **Request body** — `userId`, `email`, `passwordHash`, `fullName` bắt buộc; `phone`, `role`, `status` tùy chọn
+- **Request body** — `email`, `passwordHash`, `fullName` bắt buộc; `phone`, `role`, `status` tùy chọn (`userId` do server sinh, không gửi trong body)
 
 ```json
 {
-  "userId": "user-001",
   "email": "user@example.com",
   "passwordHash": "$2b$10$...",
   "fullName": "Nguyen Van A",
@@ -161,11 +166,10 @@ Swagger UI: cùng host + `/api-docs`
 ## 3) Tenants (Model: `Tenant`)
 
 ### `POST /api/tenants`
-- **Request body** — `tenantId`, `companyName`, `taxCode`, `contactEmail` bắt buộc; `contactPhone`, `address` tùy chọn
+- **Request body** — `companyName`, `taxCode`, `contactEmail` bắt buộc; `contactPhone`, `address` tùy chọn (`tenantId` do server sinh, không gửi trong body)
 
 ```json
 {
-  "tenantId": "tenant-001",
   "companyName": "Cong ty ABC",
   "taxCode": "0123456789",
   "contactEmail": "contact@abc.com",
@@ -216,13 +220,12 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/warehouses`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `warehouseId`, `branchId`, `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; các field còn lại tùy chọn
+- **Request body** — `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; `branchId` (hoặc suy từ `managerId` / user đăng nhập), `managerId`, `warehouseSize`, `city`, `district`, `operatingHours`, `usableArea`, nhiệt độ kho lạnh… tùy chọn. **`warehouseId` do server sinh (`WH0001`…), không gửi trong body.**
 
 ```json
 {
-  "warehouseId": "wh-001",
-  "branchId": "branch-001",
-  "managerId": "user-warehouse-manager-001",
+  "branchId": "BR0001",
+  "managerId": "USR0001",
   "warehouseCode": "WH-HCM-01",
   "warehouseName": "Kho Thu Duc",
   "warehouseType": "normal_storage",
@@ -234,7 +237,7 @@ Swagger UI: cùng host + `/api-docs`
   "length": 120,
   "width": 80,
   "height": 12,
-  "totalCapacity": 5000
+  "usableArea": 9000
 }
 ```
 
@@ -291,12 +294,11 @@ Swagger UI: cùng host + `/api-docs`
   - `pagination: PaginationResponse`
 
 ### `POST /api/zones`
-- **Request body** — `zoneId`, `warehouseId`, `zoneCode`, `length`, `width` bắt buộc; `zoneName`, `zoneType` tùy chọn
+- **Request body** — `warehouseId`, `zoneCode`, `length`, `width` bắt buộc; `zoneName`, `zoneType` tùy chọn. **`zoneId` do server sinh (`ZN0001`…); `totalArea` = `length * width` và không được làm tổng zone vượt quá `total_area` của warehouse.**
 
 ```json
 {
-  "zoneId": "zone-001",
-  "warehouseId": "wh-001",
+  "warehouseId": "WH0001",
   "zoneCode": "A1",
   "zoneName": "Khu A",
   "zoneType": "normal_storage",
@@ -336,14 +338,13 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/contracts`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `contractId`, `tenantId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; các field còn lại tùy chọn
+- **Request body** — `requestId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; `tenantId`, `approvedBy`, `billingCycle`, `rentalDurationDays`, `status` tùy chọn. **`contractId` do server sinh (`CTR0001`…), không gửi trong body.**
 
 ```json
 {
-  "contractId": "contract-001",
-  "requestId": "rr-001",
-  "tenantId": "tenant-001",
-  "approvedBy": "user-admin-001",
+  "requestId": "RRQ0001",
+  "tenantId": "TEN0001",
+  "approvedBy": "USR0001",
   "contractCode": "CTR-2026-0001",
   "startDate": "2026-05-01",
   "endDate": "2026-08-01",
@@ -398,7 +399,7 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/contract-items`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `itemId`, `contractId`, `rentType`, `unitPrice` bắt buộc
+- **Request body** — `contractId`, `rentType`, `unitPrice` bắt buộc (`itemId` do server sinh `ITM…`, không gửi trong body)
 - **Rule theo `rentType`**
   - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
   - `ZONE` -> bắt buộc `zoneId`
@@ -406,10 +407,9 @@ Swagger UI: cùng host + `/api-docs`
 
 ```json
 {
-  "itemId": "ci-001",
-  "contractId": "contract-001",
+  "contractId": "CTR0001",
   "rentType": "ZONE",
-  "zoneId": "zone-001",
+  "zoneId": "ZN0001",
   "unitPrice": 30000000
 }
 ```
@@ -455,11 +455,10 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/transportation-providers`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `providerId`, `name` bắt buộc; `providerType`, `contactInfo`, `isActive` tùy chọn
+- **Request body** — `name` bắt buộc; `providerType`, `contactInfo`, `isActive` tùy chọn (`providerId` do server sinh `TPR…`, không gửi trong body)
 
 ```json
 {
-  "providerId": "tp-001",
   "name": "Fast Logistics",
   "providerType": "EXTERNAL",
   "contactInfo": "hotline: 1900xxxx",
@@ -502,16 +501,15 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/shipments`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff` hoặc `transport_staff`
-- **Request body** — `shipmentId`, `contractId`, `shipmentType`, `fromAddress`, `toAddress` bắt buộc
+- **Request body** — `contractId`, `shipmentType`, `fromAddress`, `toAddress` bắt buộc; các field còn lại tùy chọn (`shipmentId` do server sinh `SHP…`, không gửi trong body)
 
 ```json
 {
-  "shipmentId": "ship-001",
-  "contractId": "contract-001",
+  "contractId": "CTR0001",
   "shipmentType": "IMPORT",
-  "providerId": "tp-001",
-  "driverId": "user-driver-001",
-  "supervisorId": "user-wh-manager-001",
+  "providerId": "TPR0001",
+  "driverId": "USR0001",
+  "supervisorId": "USR0002",
   "fromAddress": "Cang Cat Lai, HCM",
   "toAddress": "Kho Thu Duc, HCM",
   "scheduledTime": "2026-06-01T08:00:00.000Z",
@@ -557,15 +555,14 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/transport-stations`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `stationId`, `providerId`, `stationName` bắt buộc; `address`, `managerId` tùy chọn
+- **Request body** — `providerId`, `stationName` bắt buộc; `address`, `managerId` tùy chọn (`stationId` do server sinh `STN…`, không gửi trong body)
 
 ```json
 {
-  "stationId": "ts-001",
-  "providerId": "tp-001",
+  "providerId": "TPR0001",
   "stationName": "Tram Cat Lai",
   "address": "Quan 2, HCM",
-  "managerId": "user-transport-manager-001"
+  "managerId": "USR0001"
 }
 ```
 
@@ -602,7 +599,7 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/import-export-records`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `recordId`, `contractId`, `warehouseId`, `recordType`, `recordCode`, `scheduledDatetime` bắt buộc
+- **Request body** — `contractId`, `warehouseId`, `recordType`, `recordCode`, `scheduledDatetime` bắt buộc (`recordId` do server sinh `IER…`, không gửi trong body)
 - **Rule theo `scopeType`**
   - `WAREHOUSE` -> không bắt buộc `zoneId`/`slotId`
   - `ZONE` -> bắt buộc `zoneId`
@@ -610,18 +607,17 @@ Swagger UI: cùng host + `/api-docs`
 
 ```json
 {
-  "recordId": "ier-001",
-  "contractId": "contract-001",
-  "warehouseId": "wh-001",
+  "contractId": "CTR0001",
+  "warehouseId": "WH0001",
   "scopeType": "ZONE",
-  "zoneId": "zone-001",
+  "zoneId": "ZN0001",
   "recordType": "IMPORT",
   "recordCode": "IER-2026-0001",
   "scheduledDatetime": "2026-06-10T08:00:00.000Z",
   "quantity": 120,
   "weight": 1500,
   "isFullZone": false,
-  "responsibleStaffId": "user-wh-staff-001",
+  "responsibleStaffId": "USR0001",
   "status": "PENDING",
   "notes": "Nhap dot 1"
 }
@@ -693,22 +689,33 @@ Swagger UI: cùng host + `/api-docs`
 ## 12) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
 
 ### `POST /api/rental-requests`
-- **Request body** — `requestId`, `tenantId`, `warehouseId`, `requestedStartDate`, `durationDays` (≥ 15) bắt buộc; `notes`, `selectedZones` tùy chọn
+- **Auth** — `Bearer token`, role: `tenant`, `tenant_admin`, hoặc `admin`
+- **Request body (flow C)** — bắt buộc: `customerType`, `contactName`, `contactPhone`, `contactEmail`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsType`, `goodsQuantity`, `goodsWeightKg`. Tùy chọn: `storageType` (chỉ `normal`), `goodsDescription`, `notes`, `selectedZones` (mảng `zoneId` thuộc đúng `warehouseId`). `tenantId` **bắt buộc trong body** khi `customerType = business`; khi `individual` có thể bỏ qua nếu user đăng nhập đã có `tenant_id` trên bản ghi user (ngược lại phải gửi `tenantId` vì DB thường `NOT NULL`). **`requestId` server tự sinh (`RRQ…`), không gửi trong body.**
+- **`rentalTermUnit`**: `MONTH` | `QUARTER` | `YEAR`; `rentalTermValue`: số nguyên dương; `durationDays` được tính nội bộ từ unit + value.
 
 ```json
 {
-  "requestId": "rr-001",
-  "tenantId": "tenant-001",
-  "warehouseId": "wh-001",
-  "requestedStartDate": "2026-05-01T00:00:00.000Z",
-  "durationDays": 30,
-  "notes": "Can bo sung zone",
-  "selectedZones": ["zone-id-1", "zone-id-2"]
+  "customerType": "individual",
+  "tenantId": "TEN0001",
+  "contactName": "Tran Thi B",
+  "contactPhone": "0912345678",
+  "contactEmail": "b@gmail.com",
+  "warehouseId": "WH0001",
+  "storageType": "normal",
+  "requestedStartDate": "2026-05-10",
+  "rentalTermUnit": "QUARTER",
+  "rentalTermValue": 1,
+  "goodsType": "Electronics",
+  "goodsDescription": "Linh kien dien tu dong hop",
+  "goodsQuantity": 80,
+  "goodsWeightKg": 600,
+  "notes": "Yeu cau kho thoang",
+  "selectedZones": ["ZN0001", "ZN0002"]
 }
 ```
 
 - **Response `201`**
-  - `RentalRequestResponse & { selectedZones: array<string> }`
+  - `RentalRequestResponse & { selectedZones: array<string> }` (`requestId` trong response là id đã sinh)
 
 ### `GET /api/rental-requests`
 - **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
@@ -725,12 +732,13 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `PATCH /api/rental-requests/{id}`
 - **Path** — `id`
-- **Request body** — field động (không `selectedZones` trong PATCH); ví dụ `notes`, `durationDays`, `warehouseId`, `requestedStartDate`
+- **Request body** — field động (không `selectedZones` trong PATCH); chỉ khi `status = PENDING`. Cho phép (trong số khác): `notes`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsQuantity`, … (`durationDays` được tính lại khi đổi `rentalTermUnit` / `rentalTermValue`)
 
 ```json
 {
   "notes": "Cap nhat ghi chu",
-  "durationDays": 45
+  "rentalTermUnit": "MONTH",
+  "rentalTermValue": 3
 }
 ```
 
@@ -763,6 +771,50 @@ Swagger UI: cùng host + `/api-docs`
 
 - **Response `200`**
   - `RentalRequestResponse` (`status = REJECTED`)
+
+## 13) Branches (`Branch`)
+
+### `POST /api/branches`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
+- **Request body** — `branchCode`, `branchName`, `address` bắt buộc; `managerId`, `city`, `isActive` tùy chọn. **`branchId` server sinh (`BR…`), không gửi trong body.**
+
+## 14) Racks (`Rack`)
+
+### `POST /api/racks`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
+- **Request body** — `zoneId`, `rackCode`, `length`, `width`, `height` bắt buộc; `rackSizeType`, `maxWeightCapacity` tùy chọn. **`rackId` server sinh (`RCK…`), không gửi trong body.**
+
+## 15) Levels (`Level`)
+
+### `POST /api/levels`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
+- **Request body** — `rackId`, `levelNumber` bắt buộc; `heightClearance`, `maxWeight` tùy chọn. **`levelId` server sinh (`LVL…`), không gửi trong body.**
+
+## 16) Slots (`Slot`)
+
+### `POST /api/slots`
+- **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
+- **Request body** — `levelId`, `slotCode`, `length`, `width`, `height` bắt buộc; `status` tùy chọn. **`slotId` server sinh (`SLT…`), không gửi trong body.**
+
+## 17) Shipment requests (`ShipmentRequest`)
+
+### `POST /api/shipment-requests`
+- **Auth** — `Bearer token`, role: `tenant_admin`
+- **Request body** — `contractId`, `shipmentType` (`IMPORT` | `EXPORT`), `fromAddress`, `toAddress` bắt buộc; `preferredPickupTime`, `notes` tùy chọn. **`requestId` server sinh (`SRQ…`), không gửi trong body** (tenant lấy từ user đăng nhập).
+
+```json
+{
+  "contractId": "CTR0001",
+  "shipmentType": "IMPORT",
+  "fromAddress": "Kho A, HCM",
+  "toAddress": "Cang Cat Lai, HCM",
+  "preferredPickupTime": "2026-06-01T08:00:00.000Z",
+  "notes": "Giao som sang"
+}
+```
+
+- **Response `201`**
+  - Object shipment request (field camelCase theo controller, gồm `requestId` đã sinh)
 
 ## Shared Response Types
 
@@ -813,7 +865,7 @@ Swagger UI: cùng host + `/api-docs`
   "width": "number | null",
   "height": "number | null",
   "totalArea": "number | null",
-  "totalCapacity": "number | null",
+  "usableArea": "number | null",
   "isActive": "boolean",
   "createdAt": "datetime",
   "updatedAt": "datetime"
@@ -842,10 +894,22 @@ Swagger UI: cùng host + `/api-docs`
 ```json
 {
   "requestId": "string",
-  "tenantId": "string",
-  "status": "PENDING | APPROVED | REJECTED | string",
-  "requestedStartDate": "datetime",
+  "customerType": "individual | business",
+  "tenantId": "string | null",
+  "contactName": "string",
+  "contactPhone": "string",
+  "contactEmail": "string",
+  "warehouseId": "string",
+  "storageType": "string",
+  "status": "PENDING | APPROVED | REJECTED",
+  "requestedStartDate": "date",
+  "rentalTermUnit": "MONTH | QUARTER | YEAR",
+  "rentalTermValue": "integer",
   "durationDays": "integer",
+  "goodsType": "string",
+  "goodsDescription": "string | null",
+  "goodsQuantity": "number",
+  "goodsWeightKg": "number",
   "notes": "string | null",
   "approvedBy": "string | null",
   "rejectedReason": "string | null",
@@ -974,20 +1038,16 @@ Swagger UI: cùng host + `/api-docs`
 }
 ```
 
-## Models hiện chưa có API route/controller riêng
+## Models hiện chưa có API route/controller riêng (trong tài liệu này)
 
-Hiện trong `src/models` có một số model chưa được expose endpoint trực tiếp (chưa thấy route/controller tương ứng), gồm:
+Một số model trong `src/models` chưa được mô tả endpoint chi tiết trong file này, gồm:
 
 - `Promotion`
-- `Level`
 - `Invoice`
 - `PricingRule`
-- `Branch`
 - `Payment`
 - `QrTag`
-- `Notification`
+- `Notification` (tạo nội bộ)
 - `AuditLog`
-- `Rack`
-- `Slot`
 
-Nếu bạn muốn, mình có thể tạo tiếp tài liệu phase 2: đề xuất CRUD endpoint chuẩn REST cho nhóm model này luôn.
+`Branch`, `Rack`, `Level`, `Slot` đã có REST tương ứng (`/api/branches`, `/api/racks`, `/api/levels`, `/api/slots`).

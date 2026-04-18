@@ -25,7 +25,6 @@ const CREATE_REQUIRED_FIELDS = ['levelId', 'slotCode', 'length', 'width', 'heigh
 export async function createSlot(req, res) {
   try {
     const {
-      slotId: incomingSlotId = null,
       levelId,
       slotCode,
       length,
@@ -34,7 +33,7 @@ export async function createSlot(req, res) {
       status = 'EMPTY',
     } = req.body;
 
-    const slotId = incomingSlotId || await generatePrefixedId(pool, {
+    const slotId = await generatePrefixedId(pool, {
       tableName: SLOT_TABLE,
       idColumn: 'slot_id',
       prefix: 'SLT',

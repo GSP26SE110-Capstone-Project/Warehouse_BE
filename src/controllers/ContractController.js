@@ -68,7 +68,6 @@ async function createNotification(client, userId, { type, title, content }) {
 export async function createContract(req, res) {
   try {
     const {
-      contractId: incomingContractId = null,
       requestId,
       tenantId = null,
       approvedBy = null,
@@ -80,7 +79,7 @@ export async function createContract(req, res) {
       totalRentalFee,
       status = 'DRAFT',
     } = req.body;
-    const contractId = incomingContractId || await generatePrefixedId(pool, {
+    const contractId = await generatePrefixedId(pool, {
       tableName: CONTRACT_TABLE,
       idColumn: 'contract_id',
       prefix: 'CTR',

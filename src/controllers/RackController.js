@@ -25,7 +25,6 @@ const CREATE_REQUIRED_FIELDS = ['zoneId', 'rackCode', 'length', 'width', 'height
 export async function createRack(req, res) {
   try {
     const {
-      rackId: incomingRackId = null,
       zoneId,
       rackCode,
       rackSizeType = null,
@@ -35,7 +34,7 @@ export async function createRack(req, res) {
       maxWeightCapacity = null,
     } = req.body;
 
-    const rackId = incomingRackId || await generatePrefixedId(pool, {
+    const rackId = await generatePrefixedId(pool, {
       tableName: RACK_TABLE,
       idColumn: 'rack_id',
       prefix: 'RCK',

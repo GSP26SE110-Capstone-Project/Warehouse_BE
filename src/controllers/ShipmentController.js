@@ -52,7 +52,6 @@ async function createNotification(client, userId, title, content) {
 export async function createShipment(req, res) {
   try {
     const {
-      shipmentId: incomingShipmentId = null,
       contractId,
       shipmentType,
       providerId = null,
@@ -68,7 +67,7 @@ export async function createShipment(req, res) {
       shippingFee = null,
       status = 'SCHEDULING',
     } = req.body;
-    const shipmentId = incomingShipmentId || await generatePrefixedId(pool, {
+    const shipmentId = await generatePrefixedId(pool, {
       tableName: SHIPMENT_TABLE,
       idColumn: 'shipment_id',
       prefix: 'SHP',

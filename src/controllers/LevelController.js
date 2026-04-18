@@ -22,14 +22,13 @@ const CREATE_REQUIRED_FIELDS = ['rackId', 'levelNumber'];
 export async function createLevel(req, res) {
   try {
     const {
-      levelId: incomingLevelId = null,
       rackId,
       levelNumber,
       heightClearance = null,
       maxWeight = null,
     } = req.body;
 
-    const levelId = incomingLevelId || await generatePrefixedId(pool, {
+    const levelId = await generatePrefixedId(pool, {
       tableName: LEVEL_TABLE,
       idColumn: 'level_id',
       prefix: 'LVL',
