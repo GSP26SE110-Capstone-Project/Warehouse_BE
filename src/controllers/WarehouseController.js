@@ -92,7 +92,6 @@ async function resolveBranchId({ branchId, managerId, currentUserId }) {
 export async function createWarehouse(req, res) {
   try {
     const {
-      warehouseId: incomingWarehouseId = null,
       branchId: incomingBranchId = null,
       managerId = null,
       warehouseCode,
@@ -108,7 +107,7 @@ export async function createWarehouse(req, res) {
       height,
       usableArea = null,
     } = req.body;
-    const warehouseId = incomingWarehouseId || await generateWarehouseId();
+    const warehouseId = await generateWarehouseId();
     const branchId = await resolveBranchId({
       branchId: incomingBranchId,
       managerId,

@@ -81,7 +81,6 @@ export async function listZones(req, res) {
 export async function createZone(req, res) {
   try {
     const {
-      zoneId: incomingZoneId = null,
       warehouseId,
       zoneCode,
       zoneName = null,
@@ -89,7 +88,7 @@ export async function createZone(req, res) {
       length,
       width,
     } = req.body;
-    const zoneId = incomingZoneId || await generatePrefixedId(pool, {
+    const zoneId = await generatePrefixedId(pool, {
       tableName: ZONE_TABLE,
       idColumn: 'zone_id',
       prefix: 'ZN',

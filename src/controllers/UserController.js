@@ -22,7 +22,6 @@ function mapUserRow(row) {
 export async function createUser(req, res) {
   try {
     const {
-      userId: incomingUserId = null,
       email,
       passwordHash, // đã hash sẵn ở middleware/service
       fullName,
@@ -30,7 +29,7 @@ export async function createUser(req, res) {
       role = 'tenant',
       status = 'active',
     } = req.body;
-    const userId = incomingUserId || await generatePrefixedId(pool, {
+    const userId = await generatePrefixedId(pool, {
       tableName: USER_TABLE,
       idColumn: 'user_id',
       prefix: 'USR',

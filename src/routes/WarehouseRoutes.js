@@ -69,9 +69,6 @@ router.get('/', listWarehouses);
  *             type: object
  *             required: [warehouseCode, warehouseName, warehouseType, address, length, width, height]
  *             properties:
- *               warehouseId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh theo dạng WH0001
  *               branchId:
  *                 type: string
  *                 description: Tùy chọn. Nếu không gửi, hệ thống tự suy ra từ managerId hoặc user đăng nhập

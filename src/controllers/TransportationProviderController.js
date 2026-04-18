@@ -19,13 +19,12 @@ function mapProviderRow(row) {
 export async function createTransportationProvider(req, res) {
   try {
     const {
-      providerId: incomingProviderId = null,
       name,
       providerType = null,
       contactInfo = null,
       isActive = true,
     } = req.body;
-    const providerId = incomingProviderId || await generatePrefixedId(pool, {
+    const providerId = await generatePrefixedId(pool, {
       tableName: PROVIDER_TABLE,
       idColumn: 'provider_id',
       prefix: 'TPR',

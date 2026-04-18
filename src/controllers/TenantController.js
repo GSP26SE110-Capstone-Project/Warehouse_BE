@@ -22,14 +22,13 @@ function mapTenantRow(row) {
 export async function createTenant(req, res) {
   try {
     const {
-      tenantId: incomingTenantId = null,
       companyName,
       taxCode,
       contactEmail,
       contactPhone,
       address,
     } = req.body;
-    const tenantId = incomingTenantId || await generatePrefixedId(pool, {
+    const tenantId = await generatePrefixedId(pool, {
       tableName: TENANT_TABLE,
       idColumn: 'tenant_id',
       prefix: 'TEN',

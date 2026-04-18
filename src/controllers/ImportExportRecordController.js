@@ -40,7 +40,6 @@ function validateScope({ scopeType, zoneId, slotId }) {
 export async function createImportExportRecord(req, res) {
   try {
     const {
-      recordId: incomingRecordId = null,
       contractId,
       warehouseId,
       scopeType = 'ZONE',
@@ -60,7 +59,7 @@ export async function createImportExportRecord(req, res) {
       cancelReason = null,
       notes = null,
     } = req.body;
-    const recordId = incomingRecordId || await generatePrefixedId(pool, {
+    const recordId = await generatePrefixedId(pool, {
       tableName: RECORD_TABLE,
       idColumn: 'record_id',
       prefix: 'IER',

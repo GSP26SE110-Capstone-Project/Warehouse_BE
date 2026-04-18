@@ -32,9 +32,6 @@ router.use(requireAuth);
  *               - taxCode
  *               - contactEmail
  *             properties:
- *               tenantId:
- *                 type: string
- *                 description: Tùy chọn. Nếu không gửi, hệ thống tự sinh (prefix TEN)
  *               companyName:
  *                 type: string
  *                 maxLength: 255

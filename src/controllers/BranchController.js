@@ -24,7 +24,6 @@ const CREATE_REQUIRED_FIELDS = ['branchCode', 'branchName', 'address'];
 export async function createBranch(req, res) {
   try {
     const {
-      branchId: incomingBranchId = null,
       managerId = null,
       branchCode,
       branchName,
@@ -33,7 +32,7 @@ export async function createBranch(req, res) {
       isActive = true,
     } = req.body;
 
-    const branchId = incomingBranchId || await generatePrefixedId(pool, {
+    const branchId = await generatePrefixedId(pool, {
       tableName: BRANCH_TABLE,
       idColumn: 'branch_id',
       prefix: 'BR',
