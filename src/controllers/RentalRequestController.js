@@ -365,23 +365,25 @@ export async function createRentalRequest(req, res) {
 export async function listRentalRequests(req, res) {
   try {
     const { page = 1, limit = 10, status, tenantId } = req.query;
-    const offset = (page - 1) * limit;
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const offset = (pageNum - 1) * limitNum;
 
-    let whereClause = '';
-    let values = [limit, offset];
-    let paramIndex = 3;
-
+    const filterValues = [];
+    const filterParts = [];
     if (status) {
-      whereClause += ` AND rr.status = $${paramIndex}`;
-      values.push(status);
-      paramIndex++;
+      filterParts.push(`rr.status = $${filterValues.length + 1}`);
+      filterValues.push(status);
     }
-
     if (tenantId) {
-      whereClause += ` AND rr.tenant_id = $${paramIndex}`;
-      values.push(tenantId);
-      paramIndex++;
+      filterParts.push(`rr.tenant_id = $${filterValues.length + 1}`);
+      filterValues.push(tenantId);
     }
+    const whereClause = filterParts.length ? ` AND ${filterParts.join(' AND ')}` : '';
+
+    const limPlaceholder = filterValues.length + 1;
+    const offPlaceholder = filterValues.length + 2;
+    const listValues = [...filterValues, limitNum, offset];
 
     const query = `
       SELECT rr.*, t.company_name as tenant_name
@@ -389,28 +391,28 @@ export async function listRentalRequests(req, res) {
       LEFT JOIN tenants t ON rr.tenant_id = t.tenant_id
       WHERE 1=1 ${whereClause}
       ORDER BY rr.created_at DESC
-      LIMIT $1 OFFSET $2;
+      LIMIT $${limPlaceholder} OFFSET $${offPlaceholder};
     `;
 
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, listValues);
     const requests = rows.map(mapRentalRequestRow);
 
-    // Đếm tổng số
+    // Đếm tổng số (cùng điều kiện lọc; placeholder $1..$n khớp filterValues)
     const countQuery = `
       SELECT COUNT(*) as total
       FROM ${RENTAL_REQUEST_TABLE} rr
       WHERE 1=1 ${whereClause};
     `;
-    const countValues = values.slice(2); // Remove limit and offset
-    const { rows: countRows } = await pool.query(countQuery, countValues);
+    const { rows: countRows } = await pool.query(countQuery, filterValues);
 
+    const total = parseInt(countRows[0].total, 10);
     return res.json({
       requests,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countRows[0].total),
-        totalPages: Math.ceil(countRows[0].total / limit),
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 0,
       },
     });
   } catch (error) {
