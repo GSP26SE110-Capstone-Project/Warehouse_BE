@@ -8,6 +8,9 @@ function mapUserRow(row) {
   const derivedStatus = row.status ?? (row.is_active === true ? 'active' : 'inactive');
   return {
     userId: row.user_id,
+    tenantId: row.tenant_id ?? null,
+    branchId: row.branch_id ?? null,
+    username: row.username ?? undefined,
     email: row.email,
     passwordHash: row.password_hash,
     fullName: row.full_name,
@@ -20,28 +23,68 @@ function mapUserRow(row) {
   };
 }
 
-// POST /users
+// POST /users — Admin tạo tài khoản tenant_admin (gắn tenant)
 export async function createUser(req, res) {
   try {
     const {
       email,
-      passwordHash, // đã hash sẵn ở middleware/service
+      passwordHash,
       fullName,
+      tenantId,
+      username: usernameBody,
+      branchId = null,
       phone = null,
-      role = 'tenant',
-      status = 'active',
+      isActive = true,
+      status,
     } = req.body;
+
+    const emailTrim = typeof email === 'string' ? email.trim() : '';
+    const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
+    const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
+    const usernameTrim =
+      typeof usernameBody === 'string' && usernameBody.trim()
+        ? usernameBody.trim()
+        : emailTrim;
+
+    if (!emailTrim || !passwordHash || !fullNameTrim || !tenantIdTrim) {
+      return res.status(400).json({
+        message: 'Thiếu thông tin: email, passwordHash, fullName và tenantId là bắt buộc',
+      });
+    }
+
+    const { rows: tenantRows } = await pool.query(
+      `SELECT 1 FROM tenants WHERE tenant_id = $1 LIMIT 1`,
+      [tenantIdTrim],
+    );
+    if (tenantRows.length === 0) {
+      return res.status(400).json({ message: 'Không tồn tại tenant với tenantId đã gửi' });
+    }
+
+    if (branchId) {
+      const { rows: br } = await pool.query(
+        `SELECT 1 FROM branches WHERE branch_id = $1 LIMIT 1`,
+        [branchId],
+      );
+      if (br.length === 0) {
+        return res.status(400).json({ message: 'Không tồn tại chi nhánh với branchId đã gửi' });
+      }
+    }
+
+    const active =
+      status !== undefined ? status === 'active' : Boolean(isActive);
+
     const userId = await generatePrefixedId(pool, {
       tableName: USER_TABLE,
       idColumn: 'user_id',
       prefix: 'USR',
     });
 
-    const isActive = status === 'active';
-
     const query = `
       INSERT INTO ${USER_TABLE} (
         user_id,
+        tenant_id,
+        branch_id,
+        username,
         email,
         password_hash,
         full_name,
@@ -49,15 +92,34 @@ export async function createUser(req, res) {
         role,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *;
     `;
 
-    const values = [userId, email, passwordHash, fullName, phone, role, isActive];
-    const { rows } = await pool.query(query, values);
+    const values = [
+      userId,
+      tenantIdTrim,
+      branchId || null,
+      usernameTrim,
+      emailTrim,
+      passwordHash,
+      fullNameTrim,
+      phone || null,
+      'tenant_admin',
+      active,
+    ];
 
-    return res.status(201).json(mapUserRow(rows[0]));
+    const { rows } = await pool.query(query, values);
+    const mapped = mapUserRow(rows[0]);
+    delete mapped.passwordHash;
+    return res.status(201).json(mapped);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ message: 'Email hoặc username đã tồn tại' });
+    }
+    if (err.code === '23503') {
+      return res.status(400).json({ message: 'Dữ liệu tham chiếu không hợp lệ (tenant/branch)' });
+    }
     console.error('Error creating user:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }

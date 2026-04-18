@@ -10,18 +10,77 @@ import {
 
 const router = express.Router();
 
-// Tạo user mới
+// Admin tạo tài khoản tenant_admin cho một tenant
 /**
  * @swagger
  * /api/users:
  *   post:
  *     tags: [Users]
- *     summary: Tạo user mới
+ *     summary: Admin tạo tài khoản tenant_admin
+ *     description: |
+ *       Chỉ dùng cho admin hệ thống tạo user quản trị tenant (`role` luôn là `tenant_admin` trên server).
+ *       `userId` không gửi trong body — server sinh. Cần JWT admin (`bearerAuth`).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - passwordHash
+ *               - fullName
+ *               - tenantId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: admin_kh@congty.com
+ *               passwordHash:
+ *                 type: string
+ *                 description: Chuỗi mật khẩu đã hash (bcrypt), do client hoặc BFF hash trước khi gọi API
+ *                 example: $2b$10$abcdefghijklmnopqrstuv
+ *               fullName:
+ *                 type: string
+ *                 example: Nguyễn Văn A
+ *               tenantId:
+ *                 type: string
+ *                 description: Mã tenant (FK `tenants.tenant_id`) mà tenant_admin này thuộc về
+ *                 example: TEN001
+ *               username:
+ *                 type: string
+ *                 description: Đăng nhập; nếu bỏ qua thì mặc định bằng `email`
+ *                 example: admin_kh
+ *               branchId:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Chi nhánh gắn tùy chọn (FK `branches.branch_id`)
+ *               phone:
+ *                 type: string
+ *                 nullable: true
+ *               isActive:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Tài khoản kích hoạt ngay (mặc định true)
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *                 description: Nếu gửi thì ưu tiên hơn `isActive` (active = true, inactive = false)
  *     responses:
  *       201:
- *         description: User created
+ *         description: Đã tạo tenant_admin (response không chứa passwordHash)
+ *       400:
+ *         description: Thiếu field bắt buộc, tenant/branch không tồn tại
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải admin
+ *       409:
+ *         description: Trùng email hoặc username
  */
-router.post('/', createUser);
+router.post('/', requireAuth, requireRoles('admin'), createUser);
 
 // Danh sách user
 /**
