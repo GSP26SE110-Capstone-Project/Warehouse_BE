@@ -68,6 +68,27 @@ router.get('/:id', getUserById);
  *         required: true
  *         schema:
  *           type: string
+ *     requestBody:
+ *       required: false
+ *       description: Ít nhất một field (email, fullName, phone, role, status, passwordHash).
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               fullName:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               passwordHash:
+ *                 type: string
+ *                 description: Chuỗi hash mật khẩu (bcrypt) nếu đổi mật khẩu
  *     responses:
  *       200:
  *         description: User updated
