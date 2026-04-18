@@ -7,7 +7,15 @@ import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { tableName as USER_TABLE } from '../models/User.js';
+import { tableName as TENANT_TABLE } from '../models/Tenant.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
+
+function trimTenantId(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return String(value);
+  const t = value.trim();
+  return t === '' ? null : t;
+}
 
 // Map DB row -> domain object
 function mapRentalRequestRow(row) {
@@ -147,60 +155,87 @@ async function createNotifications(client, userIds, { type, title, content }) {
 
 // POST /rental-requests - Tạo rental request mới
 export async function createRentalRequest(req, res) {
+  const {
+    customerType,
+    tenantId,
+    contactName,
+    contactPhone,
+    contactEmail,
+    warehouseId,
+    storageType = 'normal',
+    requestedStartDate,
+    rentalTermUnit,
+    rentalTermValue,
+    goodsType,
+    goodsDescription,
+    goodsQuantity,
+    goodsWeightKg,
+    notes,
+    selectedZones, // array of zoneIds
+  } = req.body;
+
+  const validationError = validateRentalRequestPayload({
+    customerType,
+    tenantId: trimTenantId(tenantId),
+    contactName,
+    contactPhone,
+    contactEmail,
+    warehouseId,
+    storageType,
+    requestedStartDate,
+    rentalTermUnit,
+    rentalTermValue,
+    goodsType,
+    goodsDescription,
+    goodsQuantity,
+    goodsWeightKg,
+  });
+  if (validationError) {
+    return res.status(400).json({ message: validationError });
+  }
+
+  const normalizedCustomerType = String(customerType).toLowerCase();
+  const normalizedStorageType = String(storageType || 'normal').toLowerCase();
+  const normalizedTermUnit = String(rentalTermUnit).toUpperCase();
+  const normalizedTermValue = Number(rentalTermValue);
+  const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
+
+  const tenantIdFromBody = trimTenantId(tenantId);
+  let effectiveTenantId = tenantIdFromBody;
+
+  if (!effectiveTenantId && req.user?.userId) {
+    const { rows: userRows } = await pool.query(
+      `SELECT tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+      [req.user.userId],
+    );
+    effectiveTenantId = userRows[0]?.tenant_id ? String(userRows[0].tenant_id).trim() : null;
+    if (effectiveTenantId === '') effectiveTenantId = null;
+  }
+
+  if (!effectiveTenantId) {
+    return res.status(400).json({
+      message:
+        'Thiếu tenantId. Cột tenant_id trong database là NOT NULL: với customerType = individual hãy gửi tenantId trong body hoặc đăng nhập bằng user đã gắn tenant; với business thì tenantId là bắt buộc trong body.',
+    });
+  }
+
+  const { rows: tenantRows } = await pool.query(
+    `SELECT 1 FROM ${TENANT_TABLE} WHERE tenant_id = $1 LIMIT 1`,
+    [effectiveTenantId],
+  );
+  if (tenantRows.length === 0) {
+    return res.status(400).json({ message: 'tenantId không tồn tại trong hệ thống' });
+  }
+
+  const requestId = await generatePrefixedId(pool, {
+    tableName: RENTAL_REQUEST_TABLE,
+    idColumn: 'request_id',
+    prefix: 'RRQ',
+  });
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    const {
-      requestId: incomingRequestId = null,
-      customerType,
-      tenantId,
-      contactName,
-      contactPhone,
-      contactEmail,
-      warehouseId,
-      storageType = 'normal',
-      requestedStartDate,
-      rentalTermUnit,
-      rentalTermValue,
-      goodsType,
-      goodsDescription,
-      goodsQuantity,
-      goodsWeightKg,
-      notes,
-      selectedZones, // array of zoneIds
-    } = req.body;
-    const requestId = incomingRequestId || await generatePrefixedId(pool, {
-      tableName: RENTAL_REQUEST_TABLE,
-      idColumn: 'request_id',
-      prefix: 'RRQ',
-    });
-
-    const validationError = validateRentalRequestPayload({
-      customerType,
-      tenantId,
-      contactName,
-      contactPhone,
-      contactEmail,
-      warehouseId,
-      storageType,
-      requestedStartDate,
-      rentalTermUnit,
-      rentalTermValue,
-      goodsType,
-      goodsDescription,
-      goodsQuantity,
-      goodsWeightKg,
-    });
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
-    }
-
-    const normalizedCustomerType = String(customerType).toLowerCase();
-    const normalizedStorageType = String(storageType || 'normal').toLowerCase();
-    const normalizedTermUnit = String(rentalTermUnit).toUpperCase();
-    const normalizedTermValue = Number(rentalTermValue);
-    const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
 
     // Tạo rental request
     const requestQuery = `
@@ -231,7 +266,7 @@ export async function createRentalRequest(req, res) {
     const requestValues = [
       requestId,
       normalizedCustomerType,
-      normalizedCustomerType === 'business' ? tenantId : null,
+      effectiveTenantId,
       contactName,
       contactPhone,
       contactEmail,
@@ -308,8 +343,18 @@ export async function createRentalRequest(req, res) {
 
     return res.status(201).json(result);
   } catch (error) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // ignore rollback errors
+    }
     console.error('Error creating rental request:', error);
+    if (error.code === '23502') {
+      return res.status(400).json({ message: 'Dữ liệu không hợp lệ: thiếu giá trị bắt buộc (ví dụ tenant_id)' });
+    }
+    if (error.code === '23503') {
+      return res.status(400).json({ message: 'Không thể tạo rental request: warehouseId hoặc tenantId không tồn tại' });
+    }
     return res.status(500).json({ message: 'Lỗi server' });
   } finally {
     client.release();
