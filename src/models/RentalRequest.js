@@ -16,25 +16,9 @@ export const rentalRequestSchema = {
   },
   tenantId: {
     type: 'string',
-    required: false,
+    required: true,
     foreignKey: 'tenant_id',
-    note: 'ref Tenant.tenant_id - Bắt buộc nếu customerType = business',
-  },
-  contactName: {
-    type: 'string',
-    required: true,
-    maxLength: 255,
-    note: 'Người liên hệ đại diện cho đơn đăng ký',
-  },
-  contactPhone: {
-    type: 'string',
-    required: true,
-    maxLength: 20,
-  },
-  contactEmail: {
-    type: 'string',
-    required: true,
-    maxLength: 255,
+    note: 'ref Tenant.tenant_id - Tenant tạo yêu cầu thuê',
   },
   warehouseId: {
     type: 'string',
@@ -42,11 +26,12 @@ export const rentalRequestSchema = {
     foreignKey: 'warehouse_id',
     note: 'Kho mà khách hàng muốn thuê',
   },
-  storageType: {
+  rentalType: {
     type: 'enum',
-    enum: ['normal'],
-    default: 'normal',
-    note: 'Hiện tại chỉ hỗ trợ kho thường',
+    enum: ['RACK', 'LEVEL'],
+    required: true,
+    default: 'RACK',
+    note: 'Tenant chỉ nêu nhu cầu ở mức rack hoặc level; admin sẽ phân bổ cụ thể',
   },
   status: {
     type: 'enum',
@@ -67,6 +52,7 @@ export const rentalRequestSchema = {
   rentalTermValue: {
     type: 'integer',
     required: true,
+    min: 1,
     note: 'Số kỳ thuê, ví dụ 3 MONTH hoặc 1 YEAR',
   },
   durationDays: {
@@ -86,10 +72,12 @@ export const rentalRequestSchema = {
   goodsQuantity: {
     type: 'number',
     required: true,
+    min: 0.000001,
   },
   goodsWeightKg: {
     type: 'number',
     required: true,
+    min: 0,
     note: 'Tổng trọng lượng hàng hóa (kg)',
   },
   notes: {

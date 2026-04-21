@@ -206,11 +206,6 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `TenantResponse`
 
-### `GET /api/tenants/{id}/branches`
-- **Path** — `id`
-- **Response `200`**
-  - `branches: array<object>` (raw branch row từ DB)
-
 ### `DELETE /api/tenants/{id}`
 - **Path** — `id`
 - **Response `200`**
@@ -686,22 +681,19 @@ Swagger UI: cùng host + `/api-docs`
   - `details: array<object>` — danh sách rút gọn (có `tenantId` join từ hợp đồng)
   - `detailsTruncated: boolean` — `true` nếu tổng bản ghi vượt quá số dòng trả về
 
-## 12) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 12) Rental Requests (Model: `RentalRequest`)
 
 ### `POST /api/rental-requests`
 - **Auth** — `Bearer token`, role: `tenant`, `tenant_admin`, hoặc `admin`
-- **Request body (flow C)** — bắt buộc: `customerType`, `contactName`, `contactPhone`, `contactEmail`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsType`, `goodsQuantity`, `goodsWeightKg`. Tùy chọn: `storageType` (chỉ `normal`), `goodsDescription`, `notes`, `selectedZones` (mảng `zoneId` thuộc đúng `warehouseId`). `tenantId` **bắt buộc trong body** khi `customerType = business`; khi `individual` có thể bỏ qua nếu user đăng nhập đã có `tenant_id` trên bản ghi user (ngược lại phải gửi `tenantId` vì DB thường `NOT NULL`). **`requestId` server tự sinh (`RRQ…`), không gửi trong body.**
+- **Request body** — bắt buộc: `customerType`, `tenantId` (hoặc suy ra từ user đăng nhập có gắn tenant), `warehouseId`, `rentalType` (`RACK | LEVEL`), `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsType`, `goodsQuantity`, `goodsWeightKg`. Tùy chọn: `goodsDescription`, `notes`. Tenant **không chọn zone cụ thể**. Admin sẽ phân bổ rack/level phù hợp khi xử lý.
 - **`rentalTermUnit`**: `MONTH` | `QUARTER` | `YEAR`; `rentalTermValue`: số nguyên dương; `durationDays` được tính nội bộ từ unit + value.
 
 ```json
 {
   "customerType": "individual",
   "tenantId": "TEN0001",
-  "contactName": "Tran Thi B",
-  "contactPhone": "0912345678",
-  "contactEmail": "b@gmail.com",
   "warehouseId": "WH0001",
-  "storageType": "normal",
+  "rentalType": "RACK",
   "requestedStartDate": "2026-05-10",
   "rentalTermUnit": "QUARTER",
   "rentalTermValue": 1,
@@ -709,13 +701,12 @@ Swagger UI: cùng host + `/api-docs`
   "goodsDescription": "Linh kien dien tu dong hop",
   "goodsQuantity": 80,
   "goodsWeightKg": 600,
-  "notes": "Yeu cau kho thoang",
-  "selectedZones": ["ZN0001", "ZN0002"]
+  "notes": "Yeu cau kho thoang"
 }
 ```
 
 - **Response `201`**
-  - `RentalRequestResponse & { selectedZones: array<string> }` (`requestId` trong response là id đã sinh)
+  - `RentalRequestResponse` (`requestId` trong response là id đã sinh)
 
 ### `GET /api/rental-requests`
 - **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
@@ -728,11 +719,11 @@ Swagger UI: cùng host + `/api-docs`
 - **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
-  - `RentalRequestResponse & { selectedZones: array<object> }`
+  - `RentalRequestResponse`
 
 ### `PATCH /api/rental-requests/{id}`
 - **Path** — `id`
-- **Request body** — field động (không `selectedZones` trong PATCH); chỉ khi `status = PENDING`. Cho phép (trong số khác): `notes`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsQuantity`, … (`durationDays` được tính lại khi đổi `rentalTermUnit` / `rentalTermValue`)
+- **Request body** — field động; chỉ khi `status = PENDING`. Cho phép (trong số khác): `notes`, `warehouseId`, `rentalType`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsQuantity`, … (`durationDays` được tính lại khi đổi `rentalTermUnit` / `rentalTermValue`)
 
 ```json
 {
@@ -896,11 +887,8 @@ Swagger UI: cùng host + `/api-docs`
   "requestId": "string",
   "customerType": "individual | business",
   "tenantId": "string | null",
-  "contactName": "string",
-  "contactPhone": "string",
-  "contactEmail": "string",
   "warehouseId": "string",
-  "storageType": "string",
+  "rentalType": "RACK | LEVEL",
   "status": "PENDING | APPROVED | REJECTED",
   "requestedStartDate": "date",
   "rentalTermUnit": "MONTH | QUARTER | YEAR",

@@ -29,10 +29,9 @@ router.use(requireAuth);
  *             type: object
  *             required:
  *               - customerType
- *               - contactName
- *               - contactPhone
- *               - contactEmail
+ *               - tenantId
  *               - warehouseId
+ *               - rentalType
  *               - requestedStartDate
  *               - rentalTermUnit
  *               - rentalTermValue
@@ -45,19 +44,13 @@ router.use(requireAuth);
  *                 enum: [individual, business]
  *               tenantId:
  *                 type: string
- *                 description: Bắt buộc khi customerType = business
- *               contactName:
- *                 type: string
- *               contactPhone:
- *                 type: string
- *               contactEmail:
- *                 type: string
+ *                 description: Bắt buộc. Tenant tạo yêu cầu
  *               warehouseId:
  *                 type: string
- *               storageType:
+ *               rentalType:
  *                 type: string
- *                 enum: [normal]
- *                 default: normal
+ *                 enum: [RACK, LEVEL]
+ *                 description: Tenant chỉ nêu nhu cầu theo rack/level, admin sẽ phân bổ cụ thể
  *               requestedStartDate:
  *                 type: string
  *                 format: date
@@ -72,14 +65,12 @@ router.use(requireAuth);
  *                 type: string
  *               goodsQuantity:
  *                 type: number
+ *                 minimum: 0.000001
  *               goodsWeightKg:
  *                 type: number
+ *                 minimum: 0
  *               notes:
  *                 type: string
- *               selectedZones:
- *                 type: array
- *                 items:
- *                   type: string
  *     responses:
  *       201:
  *         description: Rental request created
@@ -125,7 +116,7 @@ router.get('/', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_staff
  * /api/rental-requests/{id}:
  *   get:
  *     tags: [RentalRequests]
- *     summary: Chi tiết rental request (kèm selectedZones từ bảng liên kết)
+ *     summary: Chi tiết rental request
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -159,7 +150,7 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_st
  *           type: string
  *     requestBody:
  *       required: false
- *       description: Ít nhất một field. Chỉ khi status = PENDING. Không gửi selectedZones (dùng API rental-request-zones). Đổi rentalTermUnit/rentalTermValue sẽ cập nhật durationDays.
+ *       description: Ít nhất một field. Chỉ khi status = PENDING. Đổi rentalTermUnit/rentalTermValue sẽ cập nhật durationDays.
  *       content:
  *         application/json:
  *           schema:
@@ -170,17 +161,11 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_st
  *                 enum: [individual, business]
  *               tenantId:
  *                 type: string
- *               contactName:
- *                 type: string
- *               contactPhone:
- *                 type: string
- *               contactEmail:
- *                 type: string
  *               warehouseId:
  *                 type: string
- *               storageType:
+ *               rentalType:
  *                 type: string
- *                 enum: [normal]
+ *                 enum: [RACK, LEVEL]
  *               requestedStartDate:
  *                 type: string
  *                 format: date
@@ -195,8 +180,10 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_st
  *                 type: string
  *               goodsQuantity:
  *                 type: number
+ *                 minimum: 0.000001
  *               goodsWeightKg:
  *                 type: number
+ *                 minimum: 0
  *               notes:
  *                 type: string
  *     responses:

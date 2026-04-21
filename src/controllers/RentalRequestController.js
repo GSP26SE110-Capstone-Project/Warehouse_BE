@@ -1,8 +1,6 @@
 import pool from '../config/db.js';
 import { randomUUID } from 'crypto';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
-import { tableName as RENTAL_REQUEST_ZONE_TABLE } from '../models/RentalRequestZone.js';
-import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
@@ -24,11 +22,8 @@ function mapRentalRequestRow(row) {
     requestId: row.request_id,
     customerType: row.customer_type,
     tenantId: row.tenant_id,
-    contactName: row.contact_name,
-    contactPhone: row.contact_phone,
-    contactEmail: row.contact_email,
     warehouseId: row.warehouse_id,
-    storageType: row.storage_type,
+    rentalType: row.rental_type,
     status: row.status,
     requestedStartDate: row.requested_start_date,
     rentalTermUnit: row.rental_term_unit,
@@ -59,10 +54,8 @@ function calculateDurationDays(rentalTermUnit, rentalTermValue) {
 function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   const required = [
     'customerType',
-    'contactName',
-    'contactPhone',
-    'contactEmail',
     'warehouseId',
+    'rentalType',
     'requestedStartDate',
     'rentalTermUnit',
     'rentalTermValue',
@@ -83,13 +76,13 @@ function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   if (customerType && !['individual', 'business'].includes(customerType)) {
     return 'customerType chỉ chấp nhận individual hoặc business';
   }
-  if (customerType === 'business' && !payload.tenantId) {
-    return 'tenantId là bắt buộc khi customerType = business';
+  if (payload.tenantId !== undefined && (!String(payload.tenantId).trim())) {
+    return 'tenantId không hợp lệ';
   }
 
-  const storageType = String(payload.storageType || 'normal').toLowerCase();
-  if (storageType !== 'normal') {
-    return 'Hiện tại chỉ hỗ trợ storageType = normal';
+  const rentalType = String(payload.rentalType || '').toUpperCase();
+  if (rentalType && !['RACK', 'LEVEL'].includes(rentalType)) {
+    return 'rentalType chỉ chấp nhận RACK hoặc LEVEL';
   }
 
   const rentalTermUnit = String(payload.rentalTermUnit || '').toUpperCase();
@@ -111,10 +104,7 @@ function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
     return 'goodsQuantity phải lớn hơn 0';
   }
 
-  if (
-    payload.goodsWeightKg !== undefined &&
-    (Number(payload.goodsWeightKg) < 0 || Number.isNaN(Number(payload.goodsWeightKg)))
-  ) {
+  if (payload.goodsWeightKg !== undefined && (Number(payload.goodsWeightKg) < 0 || Number.isNaN(Number(payload.goodsWeightKg)))) {
     return 'goodsWeightKg phải >= 0';
   }
 
@@ -131,13 +121,6 @@ async function findNotifiedUserIds(client, rentalRequestRow) {
     rows.forEach((row) => result.add(row.user_id));
   }
 
-  if (rentalRequestRow.contact_email) {
-    const { rows } = await client.query(
-      `SELECT user_id FROM ${USER_TABLE} WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [rentalRequestRow.contact_email],
-    );
-    if (rows[0]?.user_id) result.add(rows[0].user_id);
-  }
   return Array.from(result);
 }
 
@@ -158,11 +141,8 @@ export async function createRentalRequest(req, res) {
   const {
     customerType,
     tenantId,
-    contactName,
-    contactPhone,
-    contactEmail,
     warehouseId,
-    storageType = 'normal',
+    rentalType,
     requestedStartDate,
     rentalTermUnit,
     rentalTermValue,
@@ -171,17 +151,13 @@ export async function createRentalRequest(req, res) {
     goodsQuantity,
     goodsWeightKg,
     notes,
-    selectedZones, // array of zoneIds
   } = req.body;
 
   const validationError = validateRentalRequestPayload({
     customerType,
     tenantId: trimTenantId(tenantId),
-    contactName,
-    contactPhone,
-    contactEmail,
     warehouseId,
-    storageType,
+    rentalType,
     requestedStartDate,
     rentalTermUnit,
     rentalTermValue,
@@ -195,7 +171,7 @@ export async function createRentalRequest(req, res) {
   }
 
   const normalizedCustomerType = String(customerType).toLowerCase();
-  const normalizedStorageType = String(storageType || 'normal').toLowerCase();
+  const normalizedRentalType = String(rentalType).toUpperCase();
   const normalizedTermUnit = String(rentalTermUnit).toUpperCase();
   const normalizedTermValue = Number(rentalTermValue);
   const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
@@ -215,7 +191,7 @@ export async function createRentalRequest(req, res) {
   if (!effectiveTenantId) {
     return res.status(400).json({
       message:
-        'Thiếu tenantId. Cột tenant_id trong database là NOT NULL: với customerType = individual hãy gửi tenantId trong body hoặc đăng nhập bằng user đã gắn tenant; với business thì tenantId là bắt buộc trong body.',
+        'Thiếu tenantId. Hãy gửi tenantId trong body hoặc đăng nhập bằng user đã gắn tenant.',
     });
   }
 
@@ -243,11 +219,8 @@ export async function createRentalRequest(req, res) {
         request_id,
         customer_type,
         tenant_id,
-        contact_name,
-        contact_phone,
-        contact_email,
         warehouse_id,
-        storage_type,
+        rental_type,
         requested_start_date,
         rental_term_unit,
         rental_term_value,
@@ -259,7 +232,7 @@ export async function createRentalRequest(req, res) {
         notes,
         status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'PENDING')
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'PENDING')
       RETURNING *;
     `;
 
@@ -267,11 +240,8 @@ export async function createRentalRequest(req, res) {
       requestId,
       normalizedCustomerType,
       effectiveTenantId,
-      contactName,
-      contactPhone,
-      contactEmail,
       warehouseId,
-      normalizedStorageType,
+      normalizedRentalType,
       requestedStartDate,
       normalizedTermUnit,
       normalizedTermValue,
@@ -284,64 +254,8 @@ export async function createRentalRequest(req, res) {
     ];
     const { rows: requestRows } = await client.query(requestQuery, requestValues);
 
-    // Thêm zones đã chọn (nếu có)
-    if (selectedZones !== undefined) {
-      if (!Array.isArray(selectedZones)) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ message: 'selectedZones phải là mảng zoneId' });
-      }
-
-      const sanitizedZoneIds = selectedZones.filter(
-        (zoneId) => typeof zoneId === 'string' && zoneId.trim() !== ''
-      );
-
-      if (sanitizedZoneIds.length !== selectedZones.length) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ message: 'selectedZones chứa zoneId không hợp lệ' });
-      }
-
-      if (sanitizedZoneIds.length > 0) {
-        const uniqueZoneIds = [...new Set(sanitizedZoneIds)];
-        const zonePlaceholders = uniqueZoneIds.map((_, i) => `$${i + 2}`).join(', ');
-        const { rows: existingZones } = await client.query(
-          `SELECT zone_id FROM ${ZONE_TABLE} WHERE warehouse_id = $1 AND zone_id IN (${zonePlaceholders})`,
-          [warehouseId, ...uniqueZoneIds],
-        );
-        const foundIds = new Set(existingZones.map((r) => r.zone_id));
-        const invalidZoneIds = uniqueZoneIds.filter((zid) => !foundIds.has(zid));
-        if (invalidZoneIds.length > 0) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({
-            message:
-              'Một hoặc nhiều zone không tồn tại hoặc không thuộc warehouse đã chọn (kiểm tra zone_id trong DB)',
-            invalidZoneIds,
-          });
-        }
-
-        const placeholders = uniqueZoneIds
-          .map((_, index) => `($1, $${index + 2})`)
-          .join(', ');
-        const zoneQuery = `
-          INSERT INTO ${RENTAL_REQUEST_ZONE_TABLE} (rental_request_id, zone_id)
-          VALUES ${placeholders};
-        `;
-        await client.query(zoneQuery, [requestId, ...uniqueZoneIds]);
-      }
-    }
-
     await client.query('COMMIT');
-
-    const result = mapRentalRequestRow(requestRows[0]);
-    if (Array.isArray(selectedZones)) {
-      const sanitized = selectedZones.filter(
-        (zoneId) => typeof zoneId === 'string' && zoneId.trim() !== '',
-      );
-      result.selectedZones = sanitized.length ? [...new Set(sanitized)] : [];
-    } else {
-      result.selectedZones = [];
-    }
-
-    return res.status(201).json(result);
+    return res.status(201).json(mapRentalRequestRow(requestRows[0]));
   } catch (error) {
     try {
       await client.query('ROLLBACK');
@@ -440,16 +354,6 @@ export async function getRentalRequestById(req, res) {
 
     const request = mapRentalRequestRow(rows[0]);
 
-    // Lấy zones đã chọn
-    const zonesQuery = `
-      SELECT z.*, rrz.zone_id
-      FROM ${RENTAL_REQUEST_ZONE_TABLE} rrz
-      JOIN ${ZONE_TABLE} z ON rrz.zone_id = z.zone_id
-      WHERE rrz.rental_request_id = $1;
-    `;
-    const { rows: zonesRows } = await pool.query(zonesQuery, [id]);
-    request.selectedZones = zonesRows;
-
     return res.json(request);
   } catch (error) {
     console.error('Error getting rental request:', error);
@@ -487,11 +391,8 @@ export async function updateRentalRequest(req, res) {
     const allowedFields = [
       'customerType',
       'tenantId',
-      'contactName',
-      'contactPhone',
-      'contactEmail',
       'warehouseId',
-      'storageType',
+      'rentalType',
       'requestedStartDate',
       'rentalTermUnit',
       'rentalTermValue',
@@ -509,7 +410,6 @@ export async function updateRentalRequest(req, res) {
     Object.keys(updates).forEach(key => {
       if (
         updates[key] === undefined ||
-        key === 'selectedZones' ||
         !allowedFields.includes(key) ||
         key === 'rentalTermUnit' ||
         key === 'rentalTermValue'
@@ -520,7 +420,7 @@ export async function updateRentalRequest(req, res) {
       fields.push(`${dbField} = $${paramIndex}`);
       let nextValue = updates[key];
       if (key === 'customerType') nextValue = String(updates[key]).toLowerCase();
-      if (key === 'storageType') nextValue = String(updates[key]).toLowerCase();
+      if (key === 'rentalType') nextValue = String(updates[key]).toUpperCase();
       values.push(nextValue);
       paramIndex++;
     });
@@ -540,12 +440,6 @@ export async function updateRentalRequest(req, res) {
 
       fields.push(`duration_days = $${paramIndex}`);
       values.push(computedDurationDays);
-      paramIndex++;
-    }
-
-    if (String(merged.customerType || '').toLowerCase() === 'individual') {
-      fields.push(`tenant_id = $${paramIndex}`);
-      values.push(null);
       paramIndex++;
     }
 
@@ -651,39 +545,16 @@ export async function approveRentalRequest(req, res) {
         ],
       );
 
-      const { rows: zoneLinks } = await client.query(
+      const rentType = approvedRequest.rental_type === 'LEVEL' ? 'SLOT' : 'ZONE';
+      await client.query(
         `
-        SELECT rrz.zone_id, z.warehouse_id
-        FROM ${RENTAL_REQUEST_ZONE_TABLE} rrz
-        INNER JOIN ${ZONE_TABLE} z ON z.zone_id = rrz.zone_id
-        WHERE rrz.rental_request_id = $1
+        INSERT INTO ${CONTRACT_ITEM_TABLE} (
+          item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
+        )
+        VALUES ($1, $2, $3, $4, NULL, NULL, 0)
         `,
-        [id],
+        [randomUUID(), generatedContractId, rentType, approvedRequest.warehouse_id],
       );
-
-      if (zoneLinks.length > 0) {
-        for (const row of zoneLinks) {
-          await client.query(
-            `
-            INSERT INTO ${CONTRACT_ITEM_TABLE} (
-              item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
-            )
-            VALUES ($1, $2, 'ZONE', $3, $4, NULL, 0)
-            `,
-            [randomUUID(), generatedContractId, row.warehouse_id, row.zone_id],
-          );
-        }
-      } else {
-        await client.query(
-          `
-          INSERT INTO ${CONTRACT_ITEM_TABLE} (
-            item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
-          )
-          VALUES ($1, $2, 'ENTIRE_WAREHOUSE', $3, NULL, NULL, 0)
-          `,
-          [randomUUID(), generatedContractId, approvedRequest.warehouse_id],
-        );
-      }
     }
 
     const userIds = await findNotifiedUserIds(client, approvedRequest);
