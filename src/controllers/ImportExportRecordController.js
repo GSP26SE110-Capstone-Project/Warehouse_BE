@@ -19,6 +19,9 @@ function mapRecordRow(row) {
     weight: row.weight,
     isFullZone: row.is_full_zone,
     responsibleStaffId: row.responsible_staff_id,
+    vehiclePlateNumber: row.vehicle_plate_number,
+    driverName: row.driver_name,
+    driverCitizenId: row.driver_citizen_id,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     status: row.status,
@@ -53,6 +56,9 @@ export async function createImportExportRecord(req, res) {
       weight = null,
       isFullZone = false,
       responsibleStaffId = null,
+      vehiclePlateNumber = null,
+      driverName = null,
+      driverCitizenId = null,
       approvedBy = null,
       approvedAt = null,
       status = 'PENDING',
@@ -92,22 +98,22 @@ export async function createImportExportRecord(req, res) {
       INSERT INTO ${RECORD_TABLE} (
         record_id, contract_id, warehouse_id, scope_type, zone_id, slot_id,
         record_type, record_code, scheduled_datetime, actual_datetime, quantity,
-        weight, is_full_zone, responsible_staff_id, approved_by, approved_at,
-        status, cancel_reason, notes
+        weight, is_full_zone, responsible_staff_id, vehicle_plate_number, driver_name, driver_citizen_id,
+        approved_by, approved_at, status, cancel_reason, notes
       )
       VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
-        $12, $13, $14, $15, $16,
-        $17, $18, $19
+        $12, $13, $14, $15, $16, $17,
+        $18, $19, $20, $21, $22
       )
       RETURNING *;
     `;
     const values = [
       recordId, contractId, warehouseId, scopeType, zoneId, slotId,
       recordType, recordCode, scheduledDatetime, actualDatetime, quantity,
-      weight, isFullZone, responsibleStaffId, approvedBy, approvedAt,
-      status, cancelReason, notes,
+      weight, isFullZone, responsibleStaffId, vehiclePlateNumber, driverName, driverCitizenId,
+      approvedBy, approvedAt, status, cancelReason, notes,
     ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapRecordRow(rows[0]));
@@ -265,6 +271,7 @@ export async function updateImportExportRecord(req, res) {
       'contractId', 'warehouseId', 'scopeType', 'zoneId', 'slotId',
       'recordType', 'recordCode', 'scheduledDatetime', 'actualDatetime',
       'quantity', 'weight', 'isFullZone', 'responsibleStaffId',
+      'vehiclePlateNumber', 'driverName', 'driverCitizenId',
       'approvedBy', 'approvedAt', 'status', 'cancelReason', 'notes',
     ];
 

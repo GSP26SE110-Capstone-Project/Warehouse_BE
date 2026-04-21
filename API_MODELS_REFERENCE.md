@@ -612,6 +612,9 @@ Swagger UI: cùng host + `/api-docs`
   "weight": 1500,
   "isFullZone": false,
   "responsibleStaffId": "USR0001",
+  "vehiclePlateNumber": "51H-12345",
+  "driverName": "Nguyen Van A",
+  "driverCitizenId": "079203001234",
   "status": "PENDING",
   "notes": "Nhap dot 1"
 }
@@ -766,7 +769,13 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/branches`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `branchCode`, `branchName`, `address` bắt buộc; `managerId`, `city`, `isActive` tùy chọn. **`branchId` server sinh (`BR…`), không gửi trong body.**
+- **Request body** — `branchCode`, `branchName` bắt buộc; `managerId`, `city`, `isActive` tùy chọn. **`branchId` server sinh (`BR…`), không gửi trong body.**
+
+### `GET /api/branches/hierarchy`
+- **Mục đích** — Lấy cây phân cấp `branch -> warehouse -> zone -> rack -> level`
+- **Query** — optional: `branchId` (nếu có thì chỉ lấy 1 branch)
+- **Response `200`**
+  - `branches: array<object>`
 
 ## 14) Racks (`Rack`)
 
@@ -1012,6 +1021,9 @@ Swagger UI: cùng host + `/api-docs`
   "weight": "number | null",
   "isFullZone": "boolean",
   "responsibleStaffId": "string | null",
+  "vehiclePlateNumber": "string | null",
+  "driverName": "string | null",
+  "driverCitizenId": "string | null",
   "approvedBy": "string | null",
   "approvedAt": "datetime | null",
   "status": "PENDING | APPROVED | COMPLETED | CANCELLED",

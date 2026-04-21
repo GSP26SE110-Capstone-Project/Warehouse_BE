@@ -4,6 +4,7 @@ import {
   createBranch,
   listBranches,
   getBranchById,
+  getBranchHierarchy,
   updateBranch,
   deleteBranch,
 } from '../controllers/BranchController.js';
@@ -42,6 +43,27 @@ const router = express.Router();
  *         description: Branch list
  */
 router.get('/', listBranches);
+
+/**
+ * @swagger
+ * /api/branches/hierarchy:
+ *   get:
+ *     tags: [Branches]
+ *     summary: Cây phân cấp branch -> warehouse -> zone -> rack -> level
+ *     parameters:
+ *       - in: query
+ *         name: branchId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Nếu truyền branchId thì chỉ lấy cây của một branch
+ *     responses:
+ *       200:
+ *         description: Branch hierarchy
+ *       404:
+ *         description: Branch không tồn tại (khi truyền branchId)
+ */
+router.get('/hierarchy', getBranchHierarchy);
 
 /**
  * @swagger

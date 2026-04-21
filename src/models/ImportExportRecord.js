@@ -82,6 +82,24 @@ export const importExportRecordSchema = {
     foreignKey: 'user_id',
     note: 'ref User.user_id - Nhân sự phụ trách thực hiện',
   },
+  vehiclePlateNumber: {
+    type: 'string',
+    required: false,
+    maxLength: 20,
+    note: 'Biển số xe vận chuyển',
+  },
+  driverName: {
+    type: 'string',
+    required: false,
+    maxLength: 255,
+    note: 'Tên tài xế vận chuyển',
+  },
+  driverCitizenId: {
+    type: 'string',
+    required: false,
+    maxLength: 20,
+    note: 'Số căn cước công dân của tài xế',
+  },
   approvedBy: {
     type: 'string',
     required: false,
