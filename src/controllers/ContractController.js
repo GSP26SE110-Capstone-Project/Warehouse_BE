@@ -2,6 +2,10 @@ import pool from '../config/db.js';
 import { randomUUID } from 'crypto';
 import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
+import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
+import { tableName as RACK_TABLE } from '../models/Rack.js';
+import { tableName as LEVEL_TABLE } from '../models/Level.js';
+import { tableName as ZONE_TABLE } from '../models/Zone.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
@@ -66,16 +70,13 @@ async function createNotification(client, userId, { type, title, content }) {
 
 // POST /contracts - Tạo contract mới
 export async function createContract(req, res) {
+  const client = await pool.connect();
   try {
     const {
       requestId,
-      tenantId = null,
       approvedBy = null,
-      contractCode,
-      startDate,
-      endDate,
-      billingCycle = null,
-      rentalDurationDays = null,
+      selectedRackIds = [],
+      selectedLevelIds = [],
       totalRentalFee,
       status = 'DRAFT',
     } = req.body;
@@ -85,30 +86,24 @@ export async function createContract(req, res) {
       prefix: 'CTR',
     });
 
-    if (!requestId || !contractCode || !startDate || !endDate || totalRentalFee === undefined) {
+    if (!requestId || totalRentalFee === undefined) {
       return res.status(400).json({
-        message: 'requestId, contractCode, startDate, endDate, totalRentalFee là bắt buộc',
+        message: 'requestId, totalRentalFee là bắt buộc',
       });
+    }
+    if (!Number.isFinite(Number(totalRentalFee)) || Number(totalRentalFee) < 0) {
+      return res.status(400).json({ message: 'totalRentalFee phải là số >= 0' });
     }
 
     if (!assertValidStatusTransition('DRAFT', status) && status !== 'DRAFT') {
       return res.status(400).json({ message: 'Trạng thái khởi tạo contract không hợp lệ' });
     }
 
-    const conflictQuery = `
-      SELECT 1
-      FROM ${CONTRACT_TABLE}
-      WHERE contract_id = $1 OR contract_code = $2
-      LIMIT 1;
-    `;
-    const { rows: conflictRows } = await pool.query(conflictQuery, [contractId, contractCode]);
-    if (conflictRows.length > 0) {
-      return res.status(409).json({ message: 'contractId hoặc contractCode đã tồn tại' });
-    }
+    await client.query('BEGIN');
 
-    const { rows: requestRows } = await pool.query(
+    const { rows: requestRows } = await client.query(
       `
-      SELECT request_id, tenant_id, status
+      SELECT request_id, tenant_id, status, requested_start_date, rental_term_unit, duration_days, rental_type, warehouse_id
       FROM ${RENTAL_REQUEST_TABLE}
       WHERE request_id = $1
       LIMIT 1
@@ -123,13 +118,23 @@ export async function createContract(req, res) {
       return res.status(400).json({ message: 'Chỉ có thể tạo contract từ request đã APPROVED' });
     }
 
-    const { rows: existingByRequestRows } = await pool.query(
+    const { rows: existingByRequestRows } = await client.query(
       `SELECT contract_id FROM ${CONTRACT_TABLE} WHERE request_id = $1 LIMIT 1`,
       [requestId],
     );
     if (existingByRequestRows.length > 0) {
       return res.status(409).json({ message: 'Request này đã có contract' });
     }
+
+    const contractCode = `CTR-${rentalRequest.request_id}`;
+    const startRaw = rentalRequest.requested_start_date;
+    const startDate = startRaw instanceof Date ? startRaw.toISOString().slice(0, 10) : String(startRaw).slice(0, 10);
+    const rentalDurationDays = Number(rentalRequest.duration_days);
+    const startNoon = new Date(`${startDate}T12:00:00.000Z`);
+    const endNoon = new Date(startNoon);
+    endNoon.setUTCDate(endNoon.getUTCDate() + rentalDurationDays);
+    const endDate = endNoon.toISOString().slice(0, 10);
+    const billingCycle = rentalRequest.rental_term_unit;
 
     const query = `
       INSERT INTO ${CONTRACT_TABLE} (
@@ -151,7 +156,7 @@ export async function createContract(req, res) {
     const values = [
       contractId,
       requestId,
-      tenantId || rentalRequest.tenant_id,
+      rentalRequest.tenant_id,
       approvedBy,
       contractCode,
       startDate,
@@ -161,11 +166,93 @@ export async function createContract(req, res) {
       totalRentalFee,
       status,
     ];
-    const { rows } = await pool.query(query, values);
+
+    const { rows } = await client.query(query, values);
+
+    if (rentalRequest.rental_type === 'RACK') {
+      if (!Array.isArray(selectedRackIds) || selectedRackIds.length === 0 || selectedLevelIds.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Request loại RACK yêu cầu selectedRackIds (không dùng selectedLevelIds)' });
+      }
+      const uniqueRackIds = [...new Set(selectedRackIds.filter((id) => typeof id === 'string' && id.trim() !== ''))];
+      if (uniqueRackIds.length !== selectedRackIds.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'selectedRackIds chứa giá trị không hợp lệ' });
+      }
+      const placeholders = uniqueRackIds.map((_, idx) => `$${idx + 2}`).join(', ');
+      const { rows: rackRows } = await client.query(
+        `
+        SELECT r.rack_id
+        FROM ${RACK_TABLE} r
+        INNER JOIN ${ZONE_TABLE} z ON z.zone_id = r.zone_id
+        WHERE z.warehouse_id = $1 AND r.rack_id IN (${placeholders})
+        `,
+        [rentalRequest.warehouse_id, ...uniqueRackIds],
+      );
+      if (rackRows.length !== uniqueRackIds.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Có rack không tồn tại hoặc không thuộc warehouse của request' });
+      }
+      const itemUnitPrice = Number(totalRentalFee) / uniqueRackIds.length;
+      for (const rackId of uniqueRackIds) {
+        await client.query(
+          `
+          INSERT INTO ${CONTRACT_ITEM_TABLE}
+          (item_id, contract_id, rent_type, warehouse_id, zone_id, rack_id, level_id, slot_id, unit_price)
+          VALUES ($1, $2, 'RACK', $3, NULL, $4, NULL, NULL, $5)
+          `,
+          [randomUUID(), contractId, rentalRequest.warehouse_id, rackId, itemUnitPrice],
+        );
+      }
+    } else if (rentalRequest.rental_type === 'LEVEL') {
+      if (!Array.isArray(selectedLevelIds) || selectedLevelIds.length === 0 || selectedRackIds.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Request loại LEVEL yêu cầu selectedLevelIds (không dùng selectedRackIds)' });
+      }
+      const uniqueLevelIds = [...new Set(selectedLevelIds.filter((id) => typeof id === 'string' && id.trim() !== ''))];
+      if (uniqueLevelIds.length !== selectedLevelIds.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'selectedLevelIds chứa giá trị không hợp lệ' });
+      }
+      const placeholders = uniqueLevelIds.map((_, idx) => `$${idx + 2}`).join(', ');
+      const { rows: levelRows } = await client.query(
+        `
+        SELECT l.level_id
+        FROM ${LEVEL_TABLE} l
+        INNER JOIN ${RACK_TABLE} r ON r.rack_id = l.rack_id
+        INNER JOIN ${ZONE_TABLE} z ON z.zone_id = r.zone_id
+        WHERE z.warehouse_id = $1 AND l.level_id IN (${placeholders})
+        `,
+        [rentalRequest.warehouse_id, ...uniqueLevelIds],
+      );
+      if (levelRows.length !== uniqueLevelIds.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Có level không tồn tại hoặc không thuộc warehouse của request' });
+      }
+      const itemUnitPrice = Number(totalRentalFee) / uniqueLevelIds.length;
+      for (const levelId of uniqueLevelIds) {
+        await client.query(
+          `
+          INSERT INTO ${CONTRACT_ITEM_TABLE}
+          (item_id, contract_id, rent_type, warehouse_id, zone_id, rack_id, level_id, slot_id, unit_price)
+          VALUES ($1, $2, 'LEVEL', $3, NULL, NULL, $4, NULL, $5)
+          `,
+          [randomUUID(), contractId, rentalRequest.warehouse_id, levelId, itemUnitPrice],
+        );
+      }
+    } else {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'rentalType của request không hợp lệ' });
+    }
+
+    await client.query('COMMIT');
     return res.status(201).json(mapContractRow(rows[0]));
   } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
     console.error('Error creating contract:', error);
     return res.status(500).json({ message: 'Lỗi server' });
+  } finally {
+    client.release();
   }
 }
 

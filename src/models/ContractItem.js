@@ -18,7 +18,7 @@ export const contractItemSchema = {
   },
   rentType: {
     type: 'enum',
-    enum: ['ENTIRE_WAREHOUSE', 'ZONE', 'SLOT'],
+    enum: ['ENTIRE_WAREHOUSE', 'ZONE', 'SLOT', 'RACK', 'LEVEL'],
     required: true,
   },
   warehouseId: {
@@ -32,6 +32,18 @@ export const contractItemSchema = {
     required: false,
     foreignKey: 'zone_id',
     note: 'ref Zone.zone_id - Nếu rentType = ZONE',
+  },
+  rackId: {
+    type: 'string',
+    required: false,
+    foreignKey: 'rack_id',
+    note: 'ref Rack.rack_id - Nếu rentType = RACK',
+  },
+  levelId: {
+    type: 'string',
+    required: false,
+    foreignKey: 'level_id',
+    note: 'ref Level.level_id - Nếu rentType = LEVEL',
   },
   slotId: {
     type: 'string',

@@ -1,8 +1,6 @@
 import pool from '../config/db.js';
 import { randomUUID } from 'crypto';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
-import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
-import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as TENANT_TABLE } from '../models/Tenant.js';
@@ -492,85 +490,17 @@ export async function approveRentalRequest(req, res) {
       return res.status(404).json({ message: 'Request không tồn tại hoặc đã được xử lý' });
     }
 
-    const { rows: existingContractRows } = await client.query(
-      `SELECT contract_id FROM ${CONTRACT_TABLE} WHERE request_id = $1 LIMIT 1`,
-      [id],
-    );
-    let generatedContractId = existingContractRows[0]?.contract_id || null;
-
-    if (!generatedContractId && approvedRequest.tenant_id) {
-      generatedContractId = randomUUID();
-      const contractCode = `CT-${Date.now()}`;
-
-      const startRaw = approvedRequest.requested_start_date;
-      const startStr =
-        startRaw instanceof Date
-          ? startRaw.toISOString().slice(0, 10)
-          : String(startRaw).slice(0, 10);
-      const durationDays = Number(approvedRequest.duration_days);
-      const startNoon = new Date(`${startStr}T12:00:00.000Z`);
-      const endNoon = new Date(startNoon);
-      endNoon.setUTCDate(endNoon.getUTCDate() + durationDays);
-      const endStr = endNoon.toISOString().slice(0, 10);
-
-      await client.query(
-        `
-        INSERT INTO ${CONTRACT_TABLE} (
-          contract_id,
-          request_id,
-          tenant_id,
-          approved_by,
-          contract_code,
-          start_date,
-          end_date,
-          billing_cycle,
-          rental_duration_days,
-          total_rental_fee,
-          status
-        )
-        VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11)
-        `,
-        [
-          generatedContractId,
-          approvedRequest.request_id,
-          approvedRequest.tenant_id,
-          approvedBy,
-          contractCode,
-          startStr,
-          endStr,
-          approvedRequest.rental_term_unit,
-          durationDays,
-          0,
-          'ACTIVE',
-        ],
-      );
-
-      const rentType = approvedRequest.rental_type === 'LEVEL' ? 'SLOT' : 'ZONE';
-      await client.query(
-        `
-        INSERT INTO ${CONTRACT_ITEM_TABLE} (
-          item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
-        )
-        VALUES ($1, $2, $3, $4, NULL, NULL, 0)
-        `,
-        [randomUUID(), generatedContractId, rentType, approvedRequest.warehouse_id],
-      );
-    }
-
     const userIds = await findNotifiedUserIds(client, approvedRequest);
     if (userIds.length > 0) {
       await createNotifications(client, userIds, {
         type: 'REQUEST_STATUS',
         title: 'Don thue kho da duoc chap nhan',
-        content: `Yeu cau ${approvedRequest.request_id} da duoc duyet. Hop dong nhap: ${generatedContractId}.`,
+        content: `Yeu cau ${approvedRequest.request_id} da duoc duyet. Admin se tao hop dong thu cong sau khi chon khong gian thue.`,
       });
     }
 
     await client.query('COMMIT');
-    return res.json({
-      ...mapRentalRequestRow(approvedRequest),
-      generatedContractId,
-    });
+    return res.json(mapRentalRequestRow(approvedRequest));
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error approving rental request:', error);

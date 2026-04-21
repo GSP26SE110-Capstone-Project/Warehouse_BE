@@ -205,15 +205,19 @@ CREATE TABLE IF NOT EXISTS contracts (
 CREATE TABLE IF NOT EXISTS contract_items (
     item_id VARCHAR(50) PRIMARY KEY,
     contract_id VARCHAR(50) NOT NULL,
-    rent_type VARCHAR(50) NOT NULL CHECK (rent_type IN ('ENTIRE_WAREHOUSE', 'ZONE', 'SLOT')),
+    rent_type VARCHAR(50) NOT NULL CHECK (rent_type IN ('ENTIRE_WAREHOUSE', 'ZONE', 'SLOT', 'RACK', 'LEVEL')),
     warehouse_id VARCHAR(50),
     zone_id VARCHAR(50),
+    rack_id VARCHAR(50),
+    level_id VARCHAR(50),
     slot_id VARCHAR(50),
     unit_price DECIMAL(15, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (contract_id) REFERENCES contracts(contract_id) ON DELETE CASCADE,
     FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
     FOREIGN KEY (zone_id) REFERENCES zones(zone_id) ON DELETE CASCADE,
+    FOREIGN KEY (rack_id) REFERENCES racks(rack_id) ON DELETE CASCADE,
+    FOREIGN KEY (level_id) REFERENCES levels(level_id) ON DELETE CASCADE,
     FOREIGN KEY (slot_id) REFERENCES slots(slot_id) ON DELETE CASCADE
 );
 

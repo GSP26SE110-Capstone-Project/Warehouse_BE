@@ -333,20 +333,18 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/contracts`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `requestId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; `tenantId`, `approvedBy`, `billingCycle`, `rentalDurationDays`, `status` tùy chọn. **`contractId` do server sinh (`CTR0001`…), không gửi trong body.**
+- **Request body** — `requestId`, `totalRentalFee` bắt buộc; `approvedBy`, `status` tùy chọn; và **chọn không gian thuê cụ thể** theo `rentalType` của request:
+  - request `RACK` -> gửi `selectedRackIds` (bắt buộc), không gửi `selectedLevelIds`
+  - request `LEVEL` -> gửi `selectedLevelIds` (bắt buộc), không gửi `selectedRackIds`
+- Các field `contractCode`, `startDate`, `endDate`, `billingCycle`, `rentalDurationDays`, `tenantId` được **tự động suy ra từ rental request**.
 
 ```json
 {
   "requestId": "RRQ0001",
-  "tenantId": "TEN0001",
   "approvedBy": "USR0001",
-  "contractCode": "CTR-2026-0001",
-  "startDate": "2026-05-01",
-  "endDate": "2026-08-01",
-  "billingCycle": "MONTH",
-  "rentalDurationDays": 92,
+  "selectedRackIds": ["RCK0001", "RCK0002"],
   "totalRentalFee": 120000000,
-  "status": "ACTIVE"
+  "status": "DRAFT"
 }
 ```
 
@@ -373,7 +371,6 @@ Swagger UI: cùng host + `/api-docs`
 
 ```json
 {
-  "billingCycle": "QUARTER",
   "totalRentalFee": 125000000,
   "status": "ACTIVE"
 }
@@ -398,13 +395,15 @@ Swagger UI: cùng host + `/api-docs`
 - **Rule theo `rentType`**
   - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
   - `ZONE` -> bắt buộc `zoneId`
+  - `RACK` -> bắt buộc `rackId`
+  - `LEVEL` -> bắt buộc `levelId`
   - `SLOT` -> bắt buộc `slotId`
 
 ```json
 {
   "contractId": "CTR0001",
-  "rentType": "ZONE",
-  "zoneId": "ZN0001",
+  "rentType": "RACK",
+  "rackId": "RCK0001",
   "unitPrice": 30000000
 }
 ```
@@ -914,12 +913,17 @@ Swagger UI: cùng host + `/api-docs`
   "tenantId": "string",
   "approvedBy": "string | null",
   "contractCode": "string",
-  "startDate": "datetime",
-  "endDate": "datetime",
+  "startDate": "date",
+  "endDate": "date",
   "billingCycle": "QUARTER | MONTH | YEAR | CUSTOM | null",
   "rentalDurationDays": "integer | null",
   "totalRentalFee": "number",
-  "status": "ACTIVE | EXPIRED | CANCELLED",
+  "contractFileUrl": "string | null",
+  "sentAt": "datetime | null",
+  "tenantSignedAt": "datetime | null",
+  "signedBy": "string | null",
+  "signatureMethod": "E_SIGN | CONFIRM | null",
+  "status": "DRAFT | SENT_TO_TENANT | SIGNED_BY_TENANT | ACTIVE | EXPIRED | CANCELLED",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
@@ -930,9 +934,11 @@ Swagger UI: cùng host + `/api-docs`
 {
   "itemId": "string",
   "contractId": "string",
-  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT",
+  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT | RACK | LEVEL",
   "warehouseId": "string | null",
   "zoneId": "string | null",
+  "rackId": "string | null",
+  "levelId": "string | null",
   "slotId": "string | null",
   "unitPrice": "number",
   "createdAt": "datetime",
