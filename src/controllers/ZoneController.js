@@ -10,7 +10,6 @@ function mapZoneRow(row) {
     warehouseId: row.warehouse_id,
     zoneCode: row.zone_code,
     zoneName: row.zone_name,
-    zoneType: row.zone_type,
     length: row.length,
     width: row.width,
     totalArea: row.total_area,
@@ -19,6 +18,14 @@ function mapZoneRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function parsePositiveNumber(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { error: `${fieldName} phải là số > 0` };
+  }
+  return { value: parsed };
 }
 
 // GET /zones?available=true&warehouseId=...
@@ -84,7 +91,6 @@ export async function createZone(req, res) {
       warehouseId,
       zoneCode,
       zoneName = null,
-      zoneType = null,
       length,
       width,
     } = req.body;
@@ -107,10 +113,11 @@ export async function createZone(req, res) {
       return res.status(400).json({ message: 'warehouseId không tồn tại trong hệ thống' });
     }
 
-    const totalArea = Number(length) * Number(width);
-    if (Number.isNaN(totalArea)) {
-      return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
-    }
+    const parsedLength = parsePositiveNumber(length, 'length');
+    if (parsedLength.error) return res.status(400).json({ message: parsedLength.error });
+    const parsedWidth = parsePositiveNumber(width, 'width');
+    if (parsedWidth.error) return res.status(400).json({ message: parsedWidth.error });
+    const totalArea = parsedLength.value * parsedWidth.value;
 
     const warehouseTotalArea = Number(warehouseCheck.rows[0].total_area ?? 0);
     const usedAreaQuery = `
@@ -145,12 +152,12 @@ export async function createZone(req, res) {
 
     const insertQuery = `
       INSERT INTO ${ZONE_TABLE} (
-        zone_id, warehouse_id, zone_code, zone_name, zone_type, length, width, total_area, is_rented
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
+        zone_id, warehouse_id, zone_code, zone_name, length, width, total_area, is_rented
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, false)
       RETURNING *;
     `;
     const { rows } = await pool.query(insertQuery, [
-      zoneId, warehouseId, zoneCode, zoneName, zoneType, length, width, totalArea
+      zoneId, warehouseId, zoneCode, zoneName, parsedLength.value, parsedWidth.value, totalArea
     ]);
     return res.status(201).json(mapZoneRow(rows[0]));
   } catch (error) {
@@ -197,9 +204,10 @@ export async function updateZone(req, res) {
     const values = [];
     let paramIndex = 1;
 
-    const allowed = ['warehouseId', 'zoneCode', 'zoneName', 'zoneType', 'length', 'width', 'isRented'];
+    const allowed = ['warehouseId', 'zoneCode', 'zoneName', 'length', 'width', 'isRented'];
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
+      if (['length', 'width'].includes(key)) continue;
       const dbField = key.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
       fields.push(`${dbField} = $${paramIndex}`);
       values.push(updates[key]);
@@ -210,11 +218,27 @@ export async function updateZone(req, res) {
     const hasLength = Object.prototype.hasOwnProperty.call(updates, 'length');
     const hasWidth = Object.prototype.hasOwnProperty.call(updates, 'width');
     if (hasLength || hasWidth) {
-      // Cập nhật total_area = (length or existing) * (width or existing)
-      fields.push(`total_area = COALESCE($${paramIndex}, (SELECT length FROM ${ZONE_TABLE} WHERE zone_id = $${paramIndex + 2})) * COALESCE($${paramIndex + 1}, (SELECT width FROM ${ZONE_TABLE} WHERE zone_id = $${paramIndex + 2}))`);
-      values.push(hasLength ? updates.length : null);
-      values.push(hasWidth ? updates.width : null);
-      paramIndex += 2;
+      const currentQuery = `SELECT length, width FROM ${ZONE_TABLE} WHERE zone_id = $1 LIMIT 1;`;
+      const { rows: currentRows } = await pool.query(currentQuery, [id]);
+      if (currentRows.length === 0) {
+        return res.status(404).json({ message: 'Zone không tồn tại' });
+      }
+      const nextLengthRaw = hasLength ? updates.length : currentRows[0].length;
+      const nextWidthRaw = hasWidth ? updates.width : currentRows[0].width;
+      const parsedLength = parsePositiveNumber(nextLengthRaw, 'length');
+      if (parsedLength.error) return res.status(400).json({ message: parsedLength.error });
+      const parsedWidth = parsePositiveNumber(nextWidthRaw, 'width');
+      if (parsedWidth.error) return res.status(400).json({ message: parsedWidth.error });
+
+      fields.push(`length = $${paramIndex}`);
+      values.push(parsedLength.value);
+      paramIndex++;
+      fields.push(`width = $${paramIndex}`);
+      values.push(parsedWidth.value);
+      paramIndex++;
+      fields.push(`total_area = $${paramIndex}`);
+      values.push(parsedLength.value * parsedWidth.value);
+      paramIndex++;
     }
 
     if (fields.length === 0) {

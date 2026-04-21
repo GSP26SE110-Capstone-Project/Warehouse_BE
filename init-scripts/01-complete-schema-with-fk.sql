@@ -99,7 +99,6 @@ CREATE TABLE IF NOT EXISTS zones (
     warehouse_id VARCHAR(50) NOT NULL,
     zone_code VARCHAR(50) NOT NULL,
     zone_name VARCHAR(255),
-    zone_type VARCHAR(50) CHECK (zone_type IN ('cold_storage', 'normal_storage')),
     length DECIMAL(10, 2) NOT NULL,
     width DECIMAL(10, 2) NOT NULL,
     total_area DECIMAL(10, 2),

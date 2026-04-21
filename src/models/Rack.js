@@ -27,21 +27,25 @@ export const rackSchema = {
   length: {
     type: 'number',
     required: true,
+    min: 0.000001,
     note: 'Chiều dài tính bằng mét',
   },
   width: {
     type: 'number',
     required: true,
+    min: 0.000001,
     note: 'Chiều rộng tính bằng mét',
   },
   height: {
     type: 'number',
     required: true,
+    min: 0.000001,
     note: 'Chiều cao tính bằng mét',
   },
   maxWeightCapacity: {
     type: 'number',
     required: false,
+    min: 0,
     note: 'Sức chứa tối đa tính bằng kg',
   },
   createdAt: {

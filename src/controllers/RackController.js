@@ -21,6 +21,23 @@ function mapRackRow(row) {
 
 const CREATE_REQUIRED_FIELDS = ['zoneId', 'rackCode', 'length', 'width', 'height'];
 
+function parsePositiveNumber(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { error: `${fieldName} phải là số > 0` };
+  }
+  return { value: parsed };
+}
+
+function parseOptionalNonNegativeNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') return { value: null };
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return { error: `${fieldName} phải là số >= 0` };
+  }
+  return { value: parsed };
+}
+
 // POST /racks
 export async function createRack(req, res) {
   try {
@@ -56,6 +73,15 @@ export async function createRack(req, res) {
       return res.status(400).json({ message: 'zoneId không tồn tại trong hệ thống' });
     }
 
+    const parsedLength = parsePositiveNumber(length, 'length');
+    if (parsedLength.error) return res.status(400).json({ message: parsedLength.error });
+    const parsedWidth = parsePositiveNumber(width, 'width');
+    if (parsedWidth.error) return res.status(400).json({ message: parsedWidth.error });
+    const parsedHeight = parsePositiveNumber(height, 'height');
+    if (parsedHeight.error) return res.status(400).json({ message: parsedHeight.error });
+    const parsedMaxWeight = parseOptionalNonNegativeNumber(maxWeightCapacity, 'maxWeightCapacity');
+    if (parsedMaxWeight.error) return res.status(400).json({ message: parsedMaxWeight.error });
+
     const conflictQuery = `
       SELECT rack_id, zone_id, rack_code
       FROM ${RACK_TABLE}
@@ -78,7 +104,16 @@ export async function createRack(req, res) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
     `;
-    const values = [rackId, zoneId, rackCode, rackSizeType, length, width, height, maxWeightCapacity];
+    const values = [
+      rackId,
+      zoneId,
+      rackCode,
+      rackSizeType,
+      parsedLength.value,
+      parsedWidth.value,
+      parsedHeight.value,
+      parsedMaxWeight.value,
+    ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapRackRow(rows[0]));
   } catch (error) {
@@ -198,9 +233,39 @@ export async function updateRack(req, res) {
     let i = 1;
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
+      if (['length', 'width', 'height', 'maxWeightCapacity'].includes(key)) continue;
       const dbField = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
       fields.push(`${dbField} = $${i}`);
       values.push(updates[key]);
+      i++;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'length')) {
+      const parsed = parsePositiveNumber(updates.length, 'length');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`length = $${i}`);
+      values.push(parsed.value);
+      i++;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'width')) {
+      const parsed = parsePositiveNumber(updates.width, 'width');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`width = $${i}`);
+      values.push(parsed.value);
+      i++;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'height')) {
+      const parsed = parsePositiveNumber(updates.height, 'height');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`height = $${i}`);
+      values.push(parsed.value);
+      i++;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'maxWeightCapacity')) {
+      const parsed = parseOptionalNonNegativeNumber(updates.maxWeightCapacity, 'maxWeightCapacity');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`max_weight_capacity = $${i}`);
+      values.push(parsed.value);
       i++;
     }
 

@@ -57,13 +57,12 @@ router.get('/', listZones);
  *                 type: string
  *               zoneName:
  *                 type: string
- *               zoneType:
- *                 type: string
- *                 enum: [cold_storage, normal_storage]
  *               length:
  *                 type: number
+ *                 minimum: 0.000001
  *               width:
  *                 type: number
+ *                 minimum: 0.000001
  *     responses:
  *       201:
  *         description: Zone created
@@ -104,7 +103,7 @@ router.get('/:id', getZoneById);
  *         required: true
  *     requestBody:
  *       required: false
- *       description: Ít nhất một field. Không gửi zoneId (khóa chính). Khi đổi length hoặc width, totalArea được tính lại.
+ *       description: Ít nhất một field. Không gửi zoneId (khóa chính). length/width phải > 0; khi đổi length hoặc width thì totalArea được tính lại.
  *       content:
  *         application/json:
  *           schema:
@@ -116,13 +115,12 @@ router.get('/:id', getZoneById);
  *                 type: string
  *               zoneName:
  *                 type: string
- *               zoneType:
- *                 type: string
- *                 enum: [cold_storage, normal_storage]
  *               length:
  *                 type: number
+ *                 minimum: 0.000001
  *               width:
  *                 type: number
+ *                 minimum: 0.000001
  *               isRented:
  *                 type: boolean
  *     responses:
