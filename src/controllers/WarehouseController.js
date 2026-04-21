@@ -19,10 +19,7 @@ function mapWarehouseRow(row) {
     managerId: row.manager_id,
     warehouseCode: row.warehouse_code,
     warehouseName: row.warehouse_name,
-    warehouseType: row.warehouse_type,
-    warehouseSize: row.warehouse_size,
     address: row.address,
-    city: row.city,
     district: row.district,
     operatingHours: row.operating_hours,
     length: row.length,
@@ -39,12 +36,30 @@ function mapWarehouseRow(row) {
 const CREATE_REQUIRED_FIELDS = [
   'warehouseCode',
   'warehouseName',
-  'warehouseType',
   'address',
   'length',
   'width',
   'height',
 ];
+
+function parsePositiveNumber(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { error: `${fieldName} phải là số > 0` };
+  }
+  return { value: parsed };
+}
+
+function parseOptionalNonNegativeNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return { value: null };
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return { error: `${fieldName} phải là số >= 0` };
+  }
+  return { value: parsed };
+}
 
 async function resolveBranchId({ branchId, managerId, currentUserId }) {
   if (branchId) return branchId;
@@ -82,15 +97,13 @@ export async function createWarehouse(req, res) {
       managerId = null,
       warehouseCode,
       warehouseName,
-      warehouseType,
-      warehouseSize = null,
       address,
-      city = null,
       district = null,
       operatingHours = null,
       length,
       width,
       height,
+      totalArea,
       usableArea = null,
     } = req.body;
     const warehouseId = await generatePrefixedId(pool, {
@@ -108,7 +121,6 @@ export async function createWarehouse(req, res) {
       branchId,
       warehouseCode,
       warehouseName,
-      warehouseType,
       address,
       length,
       width,
@@ -144,9 +156,36 @@ export async function createWarehouse(req, res) {
       }
     }
 
-    const totalArea = Number(length) * Number(width);
-    if (Number.isNaN(totalArea)) {
-      return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+    const parsedLength = parsePositiveNumber(length, 'length');
+    if (parsedLength.error) {
+      return res.status(400).json({ message: parsedLength.error });
+    }
+    const parsedWidth = parsePositiveNumber(width, 'width');
+    if (parsedWidth.error) {
+      return res.status(400).json({ message: parsedWidth.error });
+    }
+    const parsedHeight = parsePositiveNumber(height, 'height');
+    if (parsedHeight.error) {
+      return res.status(400).json({ message: parsedHeight.error });
+    }
+
+    const computedTotalArea = parsedLength.value * parsedWidth.value;
+    if (totalArea !== undefined && totalArea !== null && totalArea !== '') {
+      const parsedTotalArea = parsePositiveNumber(totalArea, 'totalArea');
+      if (parsedTotalArea.error) {
+        return res.status(400).json({ message: parsedTotalArea.error });
+      }
+      if (Math.abs(parsedTotalArea.value - computedTotalArea) > 0.0001) {
+        return res.status(400).json({ message: 'totalArea phải bằng length * width' });
+      }
+    }
+
+    const parsedUsableArea = parseOptionalNonNegativeNumber(usableArea, 'usableArea');
+    if (parsedUsableArea.error) {
+      return res.status(400).json({ message: parsedUsableArea.error });
+    }
+    if (parsedUsableArea.value !== null && parsedUsableArea.value > computedTotalArea) {
+      return res.status(400).json({ message: 'usableArea không được lớn hơn totalArea' });
     }
 
     const conflictQuery = `
@@ -171,10 +210,7 @@ export async function createWarehouse(req, res) {
         manager_id,
         warehouse_code,
         warehouse_name,
-        warehouse_type,
-        warehouse_size,
         address,
-        city,
         district,
         operating_hours,
         length,
@@ -184,7 +220,7 @@ export async function createWarehouse(req, res) {
         usable_area,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
       RETURNING *;
     `;
     const values = [
@@ -193,17 +229,14 @@ export async function createWarehouse(req, res) {
       managerId,
       warehouseCode,
       warehouseName,
-      warehouseType,
-      warehouseSize,
       address,
-      city,
       district,
       operatingHours,
-      length,
-      width,
-      height,
-      totalArea,
-      usableArea,
+      parsedLength.value,
+      parsedWidth.value,
+      parsedHeight.value,
+      computedTotalArea,
+      parsedUsableArea.value,
     ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapWarehouseRow(rows[0]));
@@ -230,7 +263,7 @@ export async function createWarehouse(req, res) {
 // Query vacant=true: kho chưa có hợp đồng ACTIVE (không thuê toàn kho / zone / slot nào trong kho)
 export async function listWarehouses(req, res) {
   try {
-    const { page = 1, limit = 10, city, warehouseType, search, vacant } = req.query;
+    const { page = 1, limit = 10, search, vacant } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE w.is_active = true';
@@ -258,18 +291,6 @@ export async function listWarehouses(req, res) {
             ))
           )
         )`;
-    }
-
-    if (city) {
-      whereClause += ` AND w.city = $${filterParamIndex}`;
-      filterValues.push(city);
-      filterParamIndex++;
-    }
-
-    if (warehouseType) {
-      whereClause += ` AND w.warehouse_type = $${filterParamIndex}`;
-      filterValues.push(warehouseType);
-      filterParamIndex++;
     }
 
     if (search) {
@@ -349,15 +370,13 @@ export async function updateWarehouse(req, res) {
       'managerId',
       'warehouseCode',
       'warehouseName',
-      'warehouseType',
-      'warehouseSize',
       'address',
-      'city',
       'district',
       'operatingHours',
       'length',
       'width',
       'height',
+      'totalArea',
       'usableArea',
       'isActive',
     ];
@@ -368,6 +387,7 @@ export async function updateWarehouse(req, res) {
 
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
+      if (['length', 'width', 'height', 'totalArea', 'usableArea'].includes(key)) continue;
       const dbField = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
       fields.push(`${dbField} = $${paramIndex}`);
       values.push(updates[key]);
@@ -380,15 +400,66 @@ export async function updateWarehouse(req, res) {
 
     const hasLength = Object.prototype.hasOwnProperty.call(updates, 'length');
     const hasWidth = Object.prototype.hasOwnProperty.call(updates, 'width');
+    const hasHeight = Object.prototype.hasOwnProperty.call(updates, 'height');
+    const hasTotalArea = Object.prototype.hasOwnProperty.call(updates, 'totalArea');
+    const hasUsableArea = Object.prototype.hasOwnProperty.call(updates, 'usableArea');
+
+    let nextLength = Number(existing.length);
+    let nextWidth = Number(existing.width);
+    let nextTotalArea = Number(existing.total_area);
+
+    if (hasLength) {
+      const parsedLength = parsePositiveNumber(updates.length, 'length');
+      if (parsedLength.error) return res.status(400).json({ message: parsedLength.error });
+      nextLength = parsedLength.value;
+      fields.push(`length = $${paramIndex}`);
+      values.push(parsedLength.value);
+      paramIndex++;
+    }
+
+    if (hasWidth) {
+      const parsedWidth = parsePositiveNumber(updates.width, 'width');
+      if (parsedWidth.error) return res.status(400).json({ message: parsedWidth.error });
+      nextWidth = parsedWidth.value;
+      fields.push(`width = $${paramIndex}`);
+      values.push(parsedWidth.value);
+      paramIndex++;
+    }
+
+    if (hasHeight) {
+      const parsedHeight = parsePositiveNumber(updates.height, 'height');
+      if (parsedHeight.error) return res.status(400).json({ message: parsedHeight.error });
+      fields.push(`height = $${paramIndex}`);
+      values.push(parsedHeight.value);
+      paramIndex++;
+    }
+
     if (hasLength || hasWidth) {
-      const nextLength = hasLength ? Number(updates.length) : Number(existing.length);
-      const nextWidth = hasWidth ? Number(updates.width) : Number(existing.width);
-      const nextTotalArea = nextLength * nextWidth;
-      if (Number.isNaN(nextTotalArea)) {
-        return res.status(400).json({ message: 'length và width phải là số hợp lệ' });
+      nextTotalArea = nextLength * nextWidth;
+    }
+
+    if (hasTotalArea) {
+      const parsedTotalArea = parsePositiveNumber(updates.totalArea, 'totalArea');
+      if (parsedTotalArea.error) return res.status(400).json({ message: parsedTotalArea.error });
+      if (Math.abs(parsedTotalArea.value - (nextLength * nextWidth)) > 0.0001) {
+        return res.status(400).json({ message: 'totalArea phải bằng length * width' });
       }
+    }
+
+    if (hasLength || hasWidth || hasTotalArea) {
       fields.push(`total_area = $${paramIndex}`);
       values.push(nextTotalArea);
+      paramIndex++;
+    }
+
+    if (hasUsableArea) {
+      const parsedUsableArea = parseOptionalNonNegativeNumber(updates.usableArea, 'usableArea');
+      if (parsedUsableArea.error) return res.status(400).json({ message: parsedUsableArea.error });
+      if (parsedUsableArea.value !== null && parsedUsableArea.value > nextTotalArea) {
+        return res.status(400).json({ message: 'usableArea không được lớn hơn totalArea' });
+      }
+      fields.push(`usable_area = $${paramIndex}`);
+      values.push(parsedUsableArea.value);
       paramIndex++;
     }
 

@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS import_export_records (
     weight DECIMAL(15, 3),
     is_full_zone BOOLEAN DEFAULT FALSE,
     responsible_staff_id VARCHAR(50),
+    vehicle_plate_number VARCHAR(20),
+    driver_name VARCHAR(255),
+    driver_citizen_id VARCHAR(20),
     approved_by VARCHAR(50),
     approved_at TIMESTAMP,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'

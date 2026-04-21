@@ -25,6 +25,4 @@ DROP TABLE IF EXISTS employees CASCADE;
 DROP TABLE IF EXISTS companies CASCADE;
 DROP TABLE IF EXISTS system_logs CASCADE;
 
--- Note: Keep these tables as they are still used:
--- - rental_request_zones (needed for multi-zone selection)
--- - All new tables from 03-complete-schema-with-fk.sql
+-- Note: Keep all active tables from the current schema.

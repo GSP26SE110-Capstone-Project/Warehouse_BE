@@ -10,6 +10,8 @@ function mapContractItemRow(row) {
     rentType: row.rent_type,
     warehouseId: row.warehouse_id,
     zoneId: row.zone_id,
+    rackId: row.rack_id,
+    levelId: row.level_id,
     slotId: row.slot_id,
     unitPrice: row.unit_price,
     createdAt: row.created_at,
@@ -17,9 +19,11 @@ function mapContractItemRow(row) {
   };
 }
 
-function validateRentTypePayload({ rentType, warehouseId, zoneId, slotId }) {
+function validateRentTypePayload({ rentType, warehouseId, zoneId, rackId, levelId, slotId }) {
   if (rentType === 'ENTIRE_WAREHOUSE') return Boolean(warehouseId);
   if (rentType === 'ZONE') return Boolean(zoneId);
+  if (rentType === 'RACK') return Boolean(rackId);
+  if (rentType === 'LEVEL') return Boolean(levelId);
   if (rentType === 'SLOT') return Boolean(slotId);
   return false;
 }
@@ -32,6 +36,8 @@ export async function createContractItem(req, res) {
       rentType,
       warehouseId = null,
       zoneId = null,
+      rackId = null,
+      levelId = null,
       slotId = null,
       unitPrice,
     } = req.body;
@@ -46,9 +52,9 @@ export async function createContractItem(req, res) {
         message: 'contractId, rentType, unitPrice là bắt buộc',
       });
     }
-    if (!validateRentTypePayload({ rentType, warehouseId, zoneId, slotId })) {
+    if (!validateRentTypePayload({ rentType, warehouseId, zoneId, rackId, levelId, slotId })) {
       return res.status(400).json({
-        message: 'rentType không hợp lệ hoặc thiếu id tương ứng (warehouseId/zoneId/slotId)',
+        message: 'rentType không hợp lệ hoặc thiếu id tương ứng (warehouseId/zoneId/rackId/levelId/slotId)',
       });
     }
 
@@ -60,12 +66,12 @@ export async function createContractItem(req, res) {
 
     const query = `
       INSERT INTO ${CONTRACT_ITEM_TABLE} (
-        item_id, contract_id, rent_type, warehouse_id, zone_id, slot_id, unit_price
+        item_id, contract_id, rent_type, warehouse_id, zone_id, rack_id, level_id, slot_id, unit_price
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *;
     `;
-    const values = [itemId, contractId, rentType, warehouseId, zoneId, slotId, unitPrice];
+    const values = [itemId, contractId, rentType, warehouseId, zoneId, rackId, levelId, slotId, unitPrice];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapContractItemRow(rows[0]));
   } catch (error) {
@@ -157,7 +163,7 @@ export async function updateContractItem(req, res) {
     }
     const currentItem = mapContractItemRow(currentRows[0]);
 
-    const allowed = ['contractId', 'rentType', 'warehouseId', 'zoneId', 'slotId', 'unitPrice'];
+    const allowed = ['contractId', 'rentType', 'warehouseId', 'zoneId', 'rackId', 'levelId', 'slotId', 'unitPrice'];
     const fields = [];
     const values = [];
     let paramIndex = 1;
@@ -180,7 +186,7 @@ export async function updateContractItem(req, res) {
     };
     if (!validateRentTypePayload(mergedItem)) {
       return res.status(400).json({
-        message: 'rentType không hợp lệ hoặc thiếu id tương ứng (warehouseId/zoneId/slotId)',
+        message: 'rentType không hợp lệ hoặc thiếu id tương ứng (warehouseId/zoneId/rackId/levelId/slotId)',
       });
     }
 

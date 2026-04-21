@@ -206,11 +206,6 @@ Swagger UI: cùng host + `/api-docs`
 - **Response `200`**
   - `TenantResponse`
 
-### `GET /api/tenants/{id}/branches`
-- **Path** — `id`
-- **Response `200`**
-  - `branches: array<object>` (raw branch row từ DB)
-
 ### `DELETE /api/tenants/{id}`
 - **Path** — `id`
 - **Response `200`**
@@ -338,20 +333,18 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/contracts`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `requestId`, `contractCode`, `startDate`, `endDate`, `totalRentalFee` bắt buộc; `tenantId`, `approvedBy`, `billingCycle`, `rentalDurationDays`, `status` tùy chọn. **`contractId` do server sinh (`CTR0001`…), không gửi trong body.**
+- **Request body** — `requestId`, `totalRentalFee` bắt buộc; `approvedBy`, `status` tùy chọn; và **chọn không gian thuê cụ thể** theo `rentalType` của request:
+  - request `RACK` -> gửi `selectedRackIds` (bắt buộc), không gửi `selectedLevelIds`
+  - request `LEVEL` -> gửi `selectedLevelIds` (bắt buộc), không gửi `selectedRackIds`
+- Các field `contractCode`, `startDate`, `endDate`, `billingCycle`, `rentalDurationDays`, `tenantId` được **tự động suy ra từ rental request**.
 
 ```json
 {
   "requestId": "RRQ0001",
-  "tenantId": "TEN0001",
   "approvedBy": "USR0001",
-  "contractCode": "CTR-2026-0001",
-  "startDate": "2026-05-01",
-  "endDate": "2026-08-01",
-  "billingCycle": "MONTH",
-  "rentalDurationDays": 92,
+  "selectedRackIds": ["RCK0001", "RCK0002"],
   "totalRentalFee": 120000000,
-  "status": "ACTIVE"
+  "status": "DRAFT"
 }
 ```
 
@@ -378,7 +371,6 @@ Swagger UI: cùng host + `/api-docs`
 
 ```json
 {
-  "billingCycle": "QUARTER",
   "totalRentalFee": 125000000,
   "status": "ACTIVE"
 }
@@ -403,13 +395,15 @@ Swagger UI: cùng host + `/api-docs`
 - **Rule theo `rentType`**
   - `ENTIRE_WAREHOUSE` -> bắt buộc `warehouseId`
   - `ZONE` -> bắt buộc `zoneId`
+  - `RACK` -> bắt buộc `rackId`
+  - `LEVEL` -> bắt buộc `levelId`
   - `SLOT` -> bắt buộc `slotId`
 
 ```json
 {
   "contractId": "CTR0001",
-  "rentType": "ZONE",
-  "zoneId": "ZN0001",
+  "rentType": "RACK",
+  "rackId": "RCK0001",
   "unitPrice": 30000000
 }
 ```
@@ -618,6 +612,9 @@ Swagger UI: cùng host + `/api-docs`
   "weight": 1500,
   "isFullZone": false,
   "responsibleStaffId": "USR0001",
+  "vehiclePlateNumber": "51H-12345",
+  "driverName": "Nguyen Van A",
+  "driverCitizenId": "079203001234",
   "status": "PENDING",
   "notes": "Nhap dot 1"
 }
@@ -686,22 +683,19 @@ Swagger UI: cùng host + `/api-docs`
   - `details: array<object>` — danh sách rút gọn (có `tenantId` join từ hợp đồng)
   - `detailsTruncated: boolean` — `true` nếu tổng bản ghi vượt quá số dòng trả về
 
-## 12) Rental Requests (Model: `RentalRequest`, `RentalRequestZone`)
+## 12) Rental Requests (Model: `RentalRequest`)
 
 ### `POST /api/rental-requests`
 - **Auth** — `Bearer token`, role: `tenant`, `tenant_admin`, hoặc `admin`
-- **Request body (flow C)** — bắt buộc: `customerType`, `contactName`, `contactPhone`, `contactEmail`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsType`, `goodsQuantity`, `goodsWeightKg`. Tùy chọn: `storageType` (chỉ `normal`), `goodsDescription`, `notes`, `selectedZones` (mảng `zoneId` thuộc đúng `warehouseId`). `tenantId` **bắt buộc trong body** khi `customerType = business`; khi `individual` có thể bỏ qua nếu user đăng nhập đã có `tenant_id` trên bản ghi user (ngược lại phải gửi `tenantId` vì DB thường `NOT NULL`). **`requestId` server tự sinh (`RRQ…`), không gửi trong body.**
+- **Request body** — bắt buộc: `customerType`, `tenantId` (hoặc suy ra từ user đăng nhập có gắn tenant), `warehouseId`, `rentalType` (`RACK | LEVEL`), `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsType`, `goodsQuantity`, `goodsWeightKg`. Tùy chọn: `goodsDescription`, `notes`. Tenant **không chọn zone cụ thể**. Admin sẽ phân bổ rack/level phù hợp khi xử lý.
 - **`rentalTermUnit`**: `MONTH` | `QUARTER` | `YEAR`; `rentalTermValue`: số nguyên dương; `durationDays` được tính nội bộ từ unit + value.
 
 ```json
 {
   "customerType": "individual",
   "tenantId": "TEN0001",
-  "contactName": "Tran Thi B",
-  "contactPhone": "0912345678",
-  "contactEmail": "b@gmail.com",
   "warehouseId": "WH0001",
-  "storageType": "normal",
+  "rentalType": "RACK",
   "requestedStartDate": "2026-05-10",
   "rentalTermUnit": "QUARTER",
   "rentalTermValue": 1,
@@ -709,13 +703,12 @@ Swagger UI: cùng host + `/api-docs`
   "goodsDescription": "Linh kien dien tu dong hop",
   "goodsQuantity": 80,
   "goodsWeightKg": 600,
-  "notes": "Yeu cau kho thoang",
-  "selectedZones": ["ZN0001", "ZN0002"]
+  "notes": "Yeu cau kho thoang"
 }
 ```
 
 - **Response `201`**
-  - `RentalRequestResponse & { selectedZones: array<string> }` (`requestId` trong response là id đã sinh)
+  - `RentalRequestResponse` (`requestId` trong response là id đã sinh)
 
 ### `GET /api/rental-requests`
 - **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
@@ -728,11 +721,11 @@ Swagger UI: cùng host + `/api-docs`
 - **Auth** — `Bearer token`, role: `tenant` hoặc `tenant_admin` hoặc `admin` hoặc `warehouse_staff` hoặc `transport_staff` (chỉ đọc)
 - **Path** — `id`
 - **Response `200`**
-  - `RentalRequestResponse & { selectedZones: array<object> }`
+  - `RentalRequestResponse`
 
 ### `PATCH /api/rental-requests/{id}`
 - **Path** — `id`
-- **Request body** — field động (không `selectedZones` trong PATCH); chỉ khi `status = PENDING`. Cho phép (trong số khác): `notes`, `warehouseId`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsQuantity`, … (`durationDays` được tính lại khi đổi `rentalTermUnit` / `rentalTermValue`)
+- **Request body** — field động; chỉ khi `status = PENDING`. Cho phép (trong số khác): `notes`, `warehouseId`, `rentalType`, `requestedStartDate`, `rentalTermUnit`, `rentalTermValue`, `goodsQuantity`, … (`durationDays` được tính lại khi đổi `rentalTermUnit` / `rentalTermValue`)
 
 ```json
 {
@@ -776,7 +769,13 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/branches`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `branchCode`, `branchName`, `address` bắt buộc; `managerId`, `city`, `isActive` tùy chọn. **`branchId` server sinh (`BR…`), không gửi trong body.**
+- **Request body** — `branchCode`, `branchName` bắt buộc; `managerId`, `city`, `isActive` tùy chọn. **`branchId` server sinh (`BR…`), không gửi trong body.**
+
+### `GET /api/branches/hierarchy`
+- **Mục đích** — Lấy cây phân cấp `branch -> warehouse -> zone -> rack -> level`
+- **Query** — optional: `branchId` (nếu có thì chỉ lấy 1 branch)
+- **Response `200`**
+  - `branches: array<object>`
 
 ## 14) Racks (`Rack`)
 
@@ -896,11 +895,8 @@ Swagger UI: cùng host + `/api-docs`
   "requestId": "string",
   "customerType": "individual | business",
   "tenantId": "string | null",
-  "contactName": "string",
-  "contactPhone": "string",
-  "contactEmail": "string",
   "warehouseId": "string",
-  "storageType": "string",
+  "rentalType": "RACK | LEVEL",
   "status": "PENDING | APPROVED | REJECTED",
   "requestedStartDate": "date",
   "rentalTermUnit": "MONTH | QUARTER | YEAR",
@@ -926,12 +922,17 @@ Swagger UI: cùng host + `/api-docs`
   "tenantId": "string",
   "approvedBy": "string | null",
   "contractCode": "string",
-  "startDate": "datetime",
-  "endDate": "datetime",
+  "startDate": "date",
+  "endDate": "date",
   "billingCycle": "QUARTER | MONTH | YEAR | CUSTOM | null",
   "rentalDurationDays": "integer | null",
   "totalRentalFee": "number",
-  "status": "ACTIVE | EXPIRED | CANCELLED",
+  "contractFileUrl": "string | null",
+  "sentAt": "datetime | null",
+  "tenantSignedAt": "datetime | null",
+  "signedBy": "string | null",
+  "signatureMethod": "E_SIGN | CONFIRM | null",
+  "status": "DRAFT | SENT_TO_TENANT | SIGNED_BY_TENANT | ACTIVE | EXPIRED | CANCELLED",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }
@@ -942,9 +943,11 @@ Swagger UI: cùng host + `/api-docs`
 {
   "itemId": "string",
   "contractId": "string",
-  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT",
+  "rentType": "ENTIRE_WAREHOUSE | ZONE | SLOT | RACK | LEVEL",
   "warehouseId": "string | null",
   "zoneId": "string | null",
+  "rackId": "string | null",
+  "levelId": "string | null",
   "slotId": "string | null",
   "unitPrice": "number",
   "createdAt": "datetime",
@@ -1018,6 +1021,9 @@ Swagger UI: cùng host + `/api-docs`
   "weight": "number | null",
   "isFullZone": "boolean",
   "responsibleStaffId": "string | null",
+  "vehiclePlateNumber": "string | null",
+  "driverName": "string | null",
+  "driverCitizenId": "string | null",
   "approvedBy": "string | null",
   "approvedAt": "datetime | null",
   "status": "PENDING | APPROVED | COMPLETED | CANCELLED",

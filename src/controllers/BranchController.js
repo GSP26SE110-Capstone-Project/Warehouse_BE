@@ -10,7 +10,6 @@ function mapBranchRow(row) {
     managerId: row.manager_id,
     branchCode: row.branch_code,
     branchName: row.branch_name,
-    address: row.address,
     city: row.city,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -18,7 +17,7 @@ function mapBranchRow(row) {
   };
 }
 
-const CREATE_REQUIRED_FIELDS = ['branchCode', 'branchName', 'address'];
+const CREATE_REQUIRED_FIELDS = ['branchCode', 'branchName'];
 
 // POST /branches
 export async function createBranch(req, res) {
@@ -27,7 +26,6 @@ export async function createBranch(req, res) {
       managerId = null,
       branchCode,
       branchName,
-      address,
       city = null,
       isActive = true,
     } = req.body;
@@ -38,7 +36,7 @@ export async function createBranch(req, res) {
       prefix: 'BR',
     });
 
-    const requiredPayload = { branchCode, branchName, address };
+    const requiredPayload = { branchCode, branchName };
     const missing = CREATE_REQUIRED_FIELDS.filter((field) =>
       requiredPayload[field] === undefined || requiredPayload[field] === null || requiredPayload[field] === ''
     );
@@ -73,12 +71,12 @@ export async function createBranch(req, res) {
 
     const query = `
       INSERT INTO ${BRANCH_TABLE} (
-        branch_id, manager_id, branch_code, branch_name, address, city, is_active
+        branch_id, manager_id, branch_code, branch_name, city, is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *;
     `;
-    const values = [branchId, managerId, branchCode, branchName, address, city, isActive];
+    const values = [branchId, managerId, branchCode, branchName, city, isActive];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapBranchRow(rows[0]));
   } catch (error) {
@@ -106,7 +104,7 @@ export async function listBranches(req, res) {
       i++;
     }
     if (search) {
-      whereClause += ` AND (b.branch_name ILIKE $${i} OR b.branch_code ILIKE $${i} OR b.address ILIKE $${i})`;
+      whereClause += ` AND (b.branch_name ILIKE $${i} OR b.branch_code ILIKE $${i})`;
       filterValues.push(`%${search}%`);
       i++;
     }
@@ -191,7 +189,7 @@ export async function updateBranch(req, res) {
       }
     }
 
-    const allowed = ['managerId', 'branchCode', 'branchName', 'address', 'city', 'isActive'];
+    const allowed = ['managerId', 'branchCode', 'branchName', 'city', 'isActive'];
     const fields = [];
     const values = [];
     let i = 1;
@@ -243,6 +241,154 @@ export async function deleteBranch(req, res) {
     return res.json({ message: 'Đã xóa branch' });
   } catch (error) {
     console.error('Error deleting branch:', error);
+    return res.status(500).json({ message: 'Lỗi server' });
+  }
+}
+
+// GET /branches/hierarchy?branchId=
+export async function getBranchHierarchy(req, res) {
+  try {
+    const { branchId } = req.query;
+    const values = [];
+    let whereClause = '';
+    if (branchId) {
+      whereClause = 'WHERE b.branch_id = $1';
+      values.push(branchId);
+    }
+
+    const query = `
+      SELECT
+        b.branch_id,
+        b.branch_code,
+        b.branch_name,
+        b.city,
+        b.is_active AS branch_is_active,
+        w.warehouse_id,
+        w.warehouse_code,
+        w.warehouse_name,
+        w.district,
+        w.length AS warehouse_length,
+        w.width AS warehouse_width,
+        w.height AS warehouse_height,
+        w.total_area AS warehouse_total_area,
+        w.usable_area AS warehouse_usable_area,
+        w.is_active AS warehouse_is_active,
+        z.zone_id,
+        z.zone_code,
+        z.zone_name,
+        z.length AS zone_length,
+        z.width AS zone_width,
+        z.total_area AS zone_total_area,
+        z.is_rented,
+        r.rack_id,
+        r.rack_code,
+        r.rack_size_type,
+        r.length AS rack_length,
+        r.width AS rack_width,
+        r.height AS rack_height,
+        r.max_weight_capacity,
+        l.level_id,
+        l.level_number,
+        l.height_clearance,
+        l.max_weight
+      FROM ${BRANCH_TABLE} b
+      LEFT JOIN warehouses w ON w.branch_id = b.branch_id
+      LEFT JOIN zones z ON z.warehouse_id = w.warehouse_id
+      LEFT JOIN racks r ON r.zone_id = z.zone_id
+      LEFT JOIN levels l ON l.rack_id = r.rack_id
+      ${whereClause}
+      ORDER BY b.branch_code, w.warehouse_code, z.zone_code, r.rack_code, l.level_number;
+    `;
+    const { rows } = await pool.query(query, values);
+
+    if (branchId && rows.length === 0) {
+      return res.status(404).json({ message: 'Branch không tồn tại' });
+    }
+
+    const branchMap = new Map();
+    for (const row of rows) {
+      if (!branchMap.has(row.branch_id)) {
+        branchMap.set(row.branch_id, {
+          branchId: row.branch_id,
+          branchCode: row.branch_code,
+          branchName: row.branch_name,
+          city: row.city,
+          isActive: row.branch_is_active,
+          warehouses: [],
+        });
+      }
+      const branchNode = branchMap.get(row.branch_id);
+
+      if (row.warehouse_id) {
+        let warehouseNode = branchNode.warehouses.find((w) => w.warehouseId === row.warehouse_id);
+        if (!warehouseNode) {
+          warehouseNode = {
+            warehouseId: row.warehouse_id,
+            warehouseCode: row.warehouse_code,
+            warehouseName: row.warehouse_name,
+            district: row.district,
+            length: row.warehouse_length,
+            width: row.warehouse_width,
+            height: row.warehouse_height,
+            totalArea: row.warehouse_total_area,
+            usableArea: row.warehouse_usable_area,
+            isActive: row.warehouse_is_active,
+            zones: [],
+          };
+          branchNode.warehouses.push(warehouseNode);
+        }
+
+        if (row.zone_id) {
+          let zoneNode = warehouseNode.zones.find((z) => z.zoneId === row.zone_id);
+          if (!zoneNode) {
+            zoneNode = {
+              zoneId: row.zone_id,
+              zoneCode: row.zone_code,
+              zoneName: row.zone_name,
+              length: row.zone_length,
+              width: row.zone_width,
+              totalArea: row.zone_total_area,
+              isRented: row.is_rented,
+              racks: [],
+            };
+            warehouseNode.zones.push(zoneNode);
+          }
+
+          if (row.rack_id) {
+            let rackNode = zoneNode.racks.find((r) => r.rackId === row.rack_id);
+            if (!rackNode) {
+              rackNode = {
+                rackId: row.rack_id,
+                rackCode: row.rack_code,
+                rackSizeType: row.rack_size_type,
+                length: row.rack_length,
+                width: row.rack_width,
+                height: row.rack_height,
+                maxWeightCapacity: row.max_weight_capacity,
+                levels: [],
+              };
+              zoneNode.racks.push(rackNode);
+            }
+
+            if (row.level_id) {
+              const exists = rackNode.levels.some((l) => l.levelId === row.level_id);
+              if (!exists) {
+                rackNode.levels.push({
+                  levelId: row.level_id,
+                  levelNumber: row.level_number,
+                  heightClearance: row.height_clearance,
+                  maxWeight: row.max_weight,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return res.json({ branches: Array.from(branchMap.values()) });
+  } catch (error) {
+    console.error('Error getting branch hierarchy:', error);
     return res.status(500).json({ message: 'Lỗi server' });
   }
 }

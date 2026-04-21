@@ -25,25 +25,22 @@ export const zoneSchema = {
     required: false,
     maxLength: 255,
   },
-  zoneType: {
-    type: 'enum',
-    enum: ['cold_storage', 'normal_storage'],
-    required: false,
-    note: 'Loại lưu trữ của zone này',
-  },
   length: {
     type: 'number',
     required: true,
+    min: 0.000001,
     note: 'Chiều dài zone (mét)',
   },
   width: {
     type: 'number',
     required: true,
+    min: 0.000001,
     note: 'Chiều rộng zone (mét)',
   },
   totalArea: {
     type: 'number',
     required: false,
+    min: 0.000001,
     note: 'Diện tích tổng = length x width (m²)',
   },
   isRented: {

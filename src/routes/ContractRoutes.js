@@ -44,41 +44,28 @@ router.get('/', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse_st
  *             type: object
  *             required:
  *               - requestId
- *               - contractCode
- *               - startDate
- *               - endDate
  *               - totalRentalFee
  *             properties:
  *               requestId:
  *                 type: string
- *                 description: ID rental request (phải tồn tại, status APPROVED, chưa gắn contract khác)
- *               contractCode:
- *                 type: string
- *                 description: Mã hợp đồng (unique)
- *               startDate:
- *                 type: string
- *                 format: date
- *               endDate:
- *                 type: string
- *                 format: date
+ *                 description: ID rental request (phải APPROVED, chưa có contract). Hệ thống tự suy ra contractCode/startDate/endDate/billingCycle/rentalDurationDays/tenantId.
  *               totalRentalFee:
  *                 type: number
  *                 description: Tổng phí thuê
- *               tenantId:
- *                 type: string
- *                 nullable: true
- *                 description: Tùy chọn; nếu bỏ trống lấy từ rental request
  *               approvedBy:
  *                 type: string
  *                 nullable: true
  *                 description: user_id người duyệt (nếu có)
- *               billingCycle:
- *                 type: string
- *                 enum: [QUARTER, MONTH, YEAR, CUSTOM]
- *                 nullable: true
- *               rentalDurationDays:
- *                 type: integer
- *                 nullable: true
+ *               selectedRackIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Bắt buộc khi rentalType của request = RACK
+ *               selectedLevelIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Bắt buộc khi rentalType của request = LEVEL
  *               status:
  *                 type: string
  *                 enum: [DRAFT, SENT_TO_TENANT, CANCELLED]
@@ -86,13 +73,8 @@ router.get('/', requireAuth, requireRoles('admin', 'tenant_admin', 'warehouse_st
  *                 description: Mặc định DRAFT; chỉ chuyển hợp lệ từ DRAFT khi tạo
  *           example:
  *             requestId: RRQ0001
- *             contractCode: CTR-2026-0001
- *             startDate: "2026-05-01"
- *             endDate: "2026-08-01"
- *             billingCycle: MONTH
- *             rentalDurationDays: 92
  *             totalRentalFee: 120000000
- *             tenantId: TEN0001
+ *             selectedRackIds: [RCK0001, RCK0002]
  *             approvedBy: USR0001
  *             status: DRAFT
  *     responses:

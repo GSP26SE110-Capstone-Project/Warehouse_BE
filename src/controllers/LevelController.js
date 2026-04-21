@@ -18,6 +18,32 @@ function mapLevelRow(row) {
 
 const CREATE_REQUIRED_FIELDS = ['rackId', 'levelNumber'];
 
+function parsePositiveInteger(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return { error: `${fieldName} phải là số nguyên > 0` };
+  }
+  return { value: parsed };
+}
+
+function parseOptionalPositiveNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') return { value: null };
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return { error: `${fieldName} phải là số > 0` };
+  }
+  return { value: parsed };
+}
+
+function parseOptionalNonNegativeNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') return { value: null };
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return { error: `${fieldName} phải là số >= 0` };
+  }
+  return { value: parsed };
+}
+
 // POST /levels
 export async function createLevel(req, res) {
   try {
@@ -50,19 +76,26 @@ export async function createLevel(req, res) {
       return res.status(400).json({ message: 'rackId không tồn tại trong hệ thống' });
     }
 
+    const parsedLevelNumber = parsePositiveInteger(levelNumber, 'levelNumber');
+    if (parsedLevelNumber.error) return res.status(400).json({ message: parsedLevelNumber.error });
+    const parsedHeightClearance = parseOptionalPositiveNumber(heightClearance, 'heightClearance');
+    if (parsedHeightClearance.error) return res.status(400).json({ message: parsedHeightClearance.error });
+    const parsedMaxWeight = parseOptionalNonNegativeNumber(maxWeight, 'maxWeight');
+    if (parsedMaxWeight.error) return res.status(400).json({ message: parsedMaxWeight.error });
+
     const conflictQuery = `
       SELECT level_id, rack_id, level_number
       FROM ${LEVEL_TABLE}
       WHERE level_id = $1 OR (rack_id = $2 AND level_number = $3)
       LIMIT 1;
     `;
-    const { rows: conflictRows } = await pool.query(conflictQuery, [levelId, rackId, levelNumber]);
+    const { rows: conflictRows } = await pool.query(conflictQuery, [levelId, rackId, parsedLevelNumber.value]);
     if (conflictRows.length > 0) {
       const existing = conflictRows[0];
       if (existing.level_id === levelId) {
         return res.status(409).json({ message: 'levelId đã tồn tại, vui lòng thử lại' });
       }
-      return res.status(409).json({ message: `levelNumber "${levelNumber}" đã tồn tại trong rack "${rackId}"` });
+      return res.status(409).json({ message: `levelNumber "${parsedLevelNumber.value}" đã tồn tại trong rack "${rackId}"` });
     }
 
     const query = `
@@ -72,7 +105,13 @@ export async function createLevel(req, res) {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *;
     `;
-    const values = [levelId, rackId, levelNumber, heightClearance, maxWeight];
+    const values = [
+      levelId,
+      rackId,
+      parsedLevelNumber.value,
+      parsedHeightClearance.value,
+      parsedMaxWeight.value,
+    ];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapLevelRow(rows[0]));
   } catch (error) {
@@ -162,7 +201,13 @@ export async function updateLevel(req, res) {
     }
 
     const nextRackId = updates.rackId || currentLevel.rack_id;
-    const nextLevelNumber = updates.levelNumber || currentLevel.level_number;
+    if (updates.levelNumber !== undefined) {
+      const parsedLevelNumber = parsePositiveInteger(updates.levelNumber, 'levelNumber');
+      if (parsedLevelNumber.error) return res.status(400).json({ message: parsedLevelNumber.error });
+    }
+    const nextLevelNumber = updates.levelNumber !== undefined
+      ? Number(updates.levelNumber)
+      : Number(currentLevel.level_number);
     if (updates.rackId !== undefined || updates.levelNumber !== undefined) {
       const conflictQuery = `
         SELECT 1
@@ -182,9 +227,32 @@ export async function updateLevel(req, res) {
     let i = 1;
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
+      if (['levelNumber', 'heightClearance', 'maxWeight'].includes(key)) continue;
       const dbField = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
       fields.push(`${dbField} = $${i}`);
       values.push(updates[key]);
+      i++;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'levelNumber')) {
+      const parsed = parsePositiveInteger(updates.levelNumber, 'levelNumber');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`level_number = $${i}`);
+      values.push(parsed.value);
+      i++;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'heightClearance')) {
+      const parsed = parseOptionalPositiveNumber(updates.heightClearance, 'heightClearance');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`height_clearance = $${i}`);
+      values.push(parsed.value);
+      i++;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'maxWeight')) {
+      const parsed = parseOptionalNonNegativeNumber(updates.maxWeight, 'maxWeight');
+      if (parsed.error) return res.status(400).json({ message: parsed.error });
+      fields.push(`max_weight = $${i}`);
+      values.push(parsed.value);
       i++;
     }
 

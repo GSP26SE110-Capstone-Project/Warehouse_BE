@@ -16,16 +16,19 @@ export const levelSchema = {
   levelNumber: {
     type: 'integer',
     required: true,
+    min: 1,
     note: '1, 2, 3... số thứ tự từ dưới lên trên',
   },
   heightClearance: {
     type: 'number',
     required: false,
+    min: 0.000001,
     note: 'Khoảng sáng chiều cao của tầng (mét)',
   },
   maxWeight: {
     type: 'number',
     required: false,
+    min: 0,
     note: 'Trọng lượng tối đa cho tầng này (kg)',
   },
   createdAt: {

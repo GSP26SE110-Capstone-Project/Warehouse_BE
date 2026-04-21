@@ -85,6 +85,15 @@ router.get('/', requireAuth, requireRoles('admin', 'warehouse_staff'), listImpor
  *               responsibleStaffId:
  *                 type: string
  *                 nullable: true
+ *               vehiclePlateNumber:
+ *                 type: string
+ *                 nullable: true
+ *               driverName:
+ *                 type: string
+ *                 nullable: true
+ *               driverCitizenId:
+ *                 type: string
+ *                 nullable: true
  *               approvedBy:
  *                 type: string
  *                 nullable: true
