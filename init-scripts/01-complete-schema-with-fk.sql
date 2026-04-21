@@ -78,8 +78,6 @@ CREATE TABLE IF NOT EXISTS warehouses (
     manager_id VARCHAR(50),
     warehouse_code VARCHAR(100) NOT NULL UNIQUE,
     warehouse_name VARCHAR(255) NOT NULL,
-    warehouse_type VARCHAR(50) NOT NULL CHECK (warehouse_type IN ('cold_storage', 'normal_storage')),
-    warehouse_size VARCHAR(50) CHECK (warehouse_size IN ('small', 'medium', 'large', 'extra_large')),
     address TEXT NOT NULL,
     city VARCHAR(100),
     district VARCHAR(100),

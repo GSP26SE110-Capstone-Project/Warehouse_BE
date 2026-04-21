@@ -32,10 +32,6 @@ const router = express.Router();
  *         schema:
  *           type: string
  *       - in: query
- *         name: warehouseType
- *         schema:
- *           type: string
- *       - in: query
  *         name: search
  *         schema:
  *           type: string
@@ -67,7 +63,7 @@ router.get('/', listWarehouses);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [warehouseCode, warehouseName, warehouseType, address, length, width, height]
+ *             required: [warehouseCode, warehouseName, address, length, width, height]
  *             properties:
  *               branchId:
  *                 type: string
@@ -78,12 +74,6 @@ router.get('/', listWarehouses);
  *                 type: string
  *               warehouseName:
  *                 type: string
- *               warehouseType:
- *                 type: string
- *                 enum: [cold_storage, normal_storage]
- *               warehouseSize:
- *                 type: string
- *                 enum: [small, medium, large, extra_large]
  *               address:
  *                 type: string
  *               city:
@@ -94,10 +84,24 @@ router.get('/', listWarehouses);
  *                 type: string
  *               length:
  *                 type: number
+ *                 minimum: 0.000001
+ *                 description: Chiều dài kho, phải > 0
  *               width:
  *                 type: number
+ *                 minimum: 0.000001
+ *                 description: Chiều rộng kho, phải > 0
  *               height:
  *                 type: number
+ *                 minimum: 0.000001
+ *                 description: Chiều cao kho, phải > 0
+ *               totalArea:
+ *                 type: number
+ *                 minimum: 0.000001
+ *                 description: Nếu truyền thì phải bằng length * width
+ *               usableArea:
+ *                 type: number
+ *                 minimum: 0
+ *                 description: Nếu truyền thì phải >= 0 và không vượt totalArea
  *               temperatureMin:
  *                 type: number
  *               temperatureMax:
@@ -146,7 +150,7 @@ router.get('/:id', getWarehouseById);
  *           type: string
  *     requestBody:
  *       required: false
- *       description: Ít nhất một field. Không gửi warehouseId (khóa chính). Khi đổi length hoặc width, totalArea được tính lại.
+ *       description: Ít nhất một field. Không gửi warehouseId (khóa chính). length/width/height phải > 0; totalArea (nếu gửi) phải bằng length * width; usableArea phải >= 0 và không vượt totalArea.
  *       content:
  *         application/json:
  *           schema:
@@ -160,12 +164,6 @@ router.get('/:id', getWarehouseById);
  *                 type: string
  *               warehouseName:
  *                 type: string
- *               warehouseType:
- *                 type: string
- *                 enum: [cold_storage, normal_storage]
- *               warehouseSize:
- *                 type: string
- *                 enum: [small, medium, large, extra_large]
  *               address:
  *                 type: string
  *               city:
@@ -176,12 +174,19 @@ router.get('/:id', getWarehouseById);
  *                 type: string
  *               length:
  *                 type: number
+ *                 minimum: 0.000001
  *               width:
  *                 type: number
+ *                 minimum: 0.000001
  *               height:
  *                 type: number
+ *                 minimum: 0.000001
+ *               totalArea:
+ *                 type: number
+ *                 minimum: 0.000001
  *               usableArea:
  *                 type: number
+ *                 minimum: 0
  *               isActive:
  *                 type: boolean
  *     responses:

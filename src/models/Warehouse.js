@@ -26,15 +26,6 @@ export const warehouseSchema = {
     required: true,
     maxLength: 255,
   },
-  warehouseType: {
-    type: 'enum',
-    enum: ['cold_storage', 'normal_storage'],
-    required: true,
-  },
-  warehouseSize: {
-    type: 'enum',
-    enum: ['small', 'medium', 'large', 'extra_large'],
-  },
   address: {
     type: 'text',
     required: true,
