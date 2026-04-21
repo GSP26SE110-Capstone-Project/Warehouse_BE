@@ -10,7 +10,6 @@ function mapBranchRow(row) {
     managerId: row.manager_id,
     branchCode: row.branch_code,
     branchName: row.branch_name,
-    address: row.address,
     city: row.city,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -18,7 +17,7 @@ function mapBranchRow(row) {
   };
 }
 
-const CREATE_REQUIRED_FIELDS = ['branchCode', 'branchName', 'address'];
+const CREATE_REQUIRED_FIELDS = ['branchCode', 'branchName'];
 
 // POST /branches
 export async function createBranch(req, res) {
@@ -27,7 +26,6 @@ export async function createBranch(req, res) {
       managerId = null,
       branchCode,
       branchName,
-      address,
       city = null,
       isActive = true,
     } = req.body;
@@ -38,7 +36,7 @@ export async function createBranch(req, res) {
       prefix: 'BR',
     });
 
-    const requiredPayload = { branchCode, branchName, address };
+    const requiredPayload = { branchCode, branchName };
     const missing = CREATE_REQUIRED_FIELDS.filter((field) =>
       requiredPayload[field] === undefined || requiredPayload[field] === null || requiredPayload[field] === ''
     );
@@ -73,12 +71,12 @@ export async function createBranch(req, res) {
 
     const query = `
       INSERT INTO ${BRANCH_TABLE} (
-        branch_id, manager_id, branch_code, branch_name, address, city, is_active
+        branch_id, manager_id, branch_code, branch_name, city, is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *;
     `;
-    const values = [branchId, managerId, branchCode, branchName, address, city, isActive];
+    const values = [branchId, managerId, branchCode, branchName, city, isActive];
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapBranchRow(rows[0]));
   } catch (error) {
@@ -106,7 +104,7 @@ export async function listBranches(req, res) {
       i++;
     }
     if (search) {
-      whereClause += ` AND (b.branch_name ILIKE $${i} OR b.branch_code ILIKE $${i} OR b.address ILIKE $${i})`;
+      whereClause += ` AND (b.branch_name ILIKE $${i} OR b.branch_code ILIKE $${i})`;
       filterValues.push(`%${search}%`);
       i++;
     }
@@ -191,7 +189,7 @@ export async function updateBranch(req, res) {
       }
     }
 
-    const allowed = ['managerId', 'branchCode', 'branchName', 'address', 'city', 'isActive'];
+    const allowed = ['managerId', 'branchCode', 'branchName', 'city', 'isActive'];
     const fields = [];
     const values = [];
     let i = 1;

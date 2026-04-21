@@ -24,10 +24,6 @@ export const branchSchema = {
     required: true,
     maxLength: 255,
   },
-  address: {
-    type: 'text',
-    required: true,
-  },
   city: {
     type: 'string',
     required: false,

@@ -189,32 +189,6 @@ export async function updateTenant(req, res) {
   }
 }
 
-// GET /tenants/:id/branches - Lấy branches của tenant
-export async function getTenantBranches(req, res) {
-  try {
-    const { id } = req.params;
-
-    // Kiểm tra tenant tồn tại
-    const tenantQuery = `SELECT 1 FROM ${TENANT_TABLE} WHERE tenant_id = $1;`;
-    const { rows: tenantRows } = await pool.query(tenantQuery, [id]);
-    if (tenantRows.length === 0) {
-      return res.status(404).json({ message: 'Tenant không tồn tại' });
-    }
-
-    const query = `
-      SELECT b.* FROM branches b
-      WHERE b.tenant_id = $1
-      ORDER BY b.created_at DESC;
-    `;
-
-    const { rows } = await pool.query(query, [id]);
-    return res.json({ branches: rows });
-  } catch (error) {
-    console.error('Error getting tenant branches:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
-  }
-}
-
 // DELETE /tenants/:id - Xóa tenant
 export async function deleteTenant(req, res) {
   try {

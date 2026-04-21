@@ -28,10 +28,6 @@ const router = express.Router();
  *         schema:
  *           type: integer
  *       - in: query
- *         name: city
- *         schema:
- *           type: string
- *       - in: query
  *         name: search
  *         schema:
  *           type: string
@@ -75,8 +71,6 @@ router.get('/', listWarehouses);
  *               warehouseName:
  *                 type: string
  *               address:
- *                 type: string
- *               city:
  *                 type: string
  *               district:
  *                 type: string
@@ -165,8 +159,6 @@ router.get('/:id', getWarehouseById);
  *               warehouseName:
  *                 type: string
  *               address:
- *                 type: string
- *               city:
  *                 type: string
  *               district:
  *                 type: string

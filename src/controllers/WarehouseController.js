@@ -20,7 +20,6 @@ function mapWarehouseRow(row) {
     warehouseCode: row.warehouse_code,
     warehouseName: row.warehouse_name,
     address: row.address,
-    city: row.city,
     district: row.district,
     operatingHours: row.operating_hours,
     length: row.length,
@@ -99,7 +98,6 @@ export async function createWarehouse(req, res) {
       warehouseCode,
       warehouseName,
       address,
-      city = null,
       district = null,
       operatingHours = null,
       length,
@@ -213,7 +211,6 @@ export async function createWarehouse(req, res) {
         warehouse_code,
         warehouse_name,
         address,
-        city,
         district,
         operating_hours,
         length,
@@ -223,7 +220,7 @@ export async function createWarehouse(req, res) {
         usable_area,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
       RETURNING *;
     `;
     const values = [
@@ -233,7 +230,6 @@ export async function createWarehouse(req, res) {
       warehouseCode,
       warehouseName,
       address,
-      city,
       district,
       operatingHours,
       parsedLength.value,
@@ -267,7 +263,7 @@ export async function createWarehouse(req, res) {
 // Query vacant=true: kho chưa có hợp đồng ACTIVE (không thuê toàn kho / zone / slot nào trong kho)
 export async function listWarehouses(req, res) {
   try {
-    const { page = 1, limit = 10, city, search, vacant } = req.query;
+    const { page = 1, limit = 10, search, vacant } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE w.is_active = true';
@@ -295,12 +291,6 @@ export async function listWarehouses(req, res) {
             ))
           )
         )`;
-    }
-
-    if (city) {
-      whereClause += ` AND w.city = $${filterParamIndex}`;
-      filterValues.push(city);
-      filterParamIndex++;
     }
 
     if (search) {
@@ -381,7 +371,6 @@ export async function updateWarehouse(req, res) {
       'warehouseCode',
       'warehouseName',
       'address',
-      'city',
       'district',
       'operatingHours',
       'length',

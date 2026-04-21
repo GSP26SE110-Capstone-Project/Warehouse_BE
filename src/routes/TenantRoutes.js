@@ -4,7 +4,6 @@ import {
   getTenantById,
   listTenants,
   updateTenant,
-  getTenantBranches,
   deleteTenant,
 } from '../controllers/TenantController.js';
 import { requireAuth, requireRoles } from '../middlewares/AuthMiddleware.js';
@@ -181,29 +180,6 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), getTenantByI
  *         description: Tenant not found
  */
 router.patch('/:id', requireRoles('tenant', 'tenant_admin', 'admin'), updateTenant);
-
-// Lấy danh sách branches của tenant
-/**
- * @swagger
- * /api/tenants/{id}/branches:
- *   get:
- *     tags: [Tenants]
- *     summary: Get tenant branches
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *         required: true
- *     responses:
- *       200:
- *         description: Branches list
- *       404:
- *         description: Tenant not found
- */
-router.get('/:id/branches', requireRoles('tenant', 'tenant_admin', 'admin'), getTenantBranches);
 
 /**
  * @swagger

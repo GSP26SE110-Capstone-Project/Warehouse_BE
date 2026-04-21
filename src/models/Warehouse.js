@@ -30,10 +30,6 @@ export const warehouseSchema = {
     type: 'text',
     required: true,
   },
-  city: {
-    type: 'string',
-    required: false,
-  },
   district: {
     type: 'string',
     required: false,

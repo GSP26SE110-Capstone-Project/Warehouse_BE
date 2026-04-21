@@ -57,15 +57,13 @@ router.get('/', listBranches);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [branchCode, branchName, address]
+ *             required: [branchCode, branchName]
  *             properties:
  *               managerId:
  *                 type: string
  *               branchCode:
  *                 type: string
  *               branchName:
- *                 type: string
- *               address:
  *                 type: string
  *               city:
  *                 type: string
