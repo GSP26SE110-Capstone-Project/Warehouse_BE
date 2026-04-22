@@ -1,16 +1,58 @@
+/**
+ * @fileoverview
+ * UserController quản lý các endpoint cho resource `users`:
+ *   - POST   /api/users           : admin tạo tài khoản nội bộ
+ *   - GET    /api/users           : list
+ *   - GET    /api/users/:id       : chi tiết
+ *   - PATCH  /api/users/:id       : cập nhật hồ sơ
+ *   - POST   /api/users/:id/restore : kích hoạt lại user đã soft-delete
+ *   - DELETE /api/users/:id       : soft delete (flip is_active = false)
+ *
+ * Nguyên tắc thiết kế (xem thêm docs/ARCHITECTURE.md):
+ *   - Password luôn hash ở server bằng bcrypt (saltRounds=10). Client gửi plaintext.
+ *   - PATCH KHÔNG dùng để đổi mật khẩu: đi qua flow forgot-password/reset-password.
+ *   - PATCH KHÔNG dùng để toggle active: đi qua DELETE + POST /:id/restore.
+ *   - Admin không tạo được user role `tenant_admin` — end-user phải tự register.
+ *   - Response không bao giờ chứa password_hash (delete trong mapper).
+ */
+
 import pool from '../config/db.js';
 import bcrypt from 'bcrypt';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
+/**
+ * Số vòng salt bcrypt khi hash password.
+ * 10 là trade-off giữa speed và security cho traffic MVP.
+ * Mỗi đơn vị tăng lên gấp đôi thời gian hash.
+ */
 const BCRYPT_SALT_ROUNDS = 10;
 
-// Role mà admin được phép tạo qua POST /api/users.
-// `tenant_admin` KHÔNG nằm trong whitelist: người dùng end-customer phải tự register
-// qua /api/auth/register để xác thực email/OTP, admin không tạo thay.
+/**
+ * Whitelist role mà admin được phép tạo qua POST /api/users.
+ *
+ * `tenant_admin` KHÔNG nằm trong whitelist: end-customer phải tự register
+ * qua /api/auth/register để hệ thống xác thực email bằng OTP. Việc này
+ * đảm bảo tenant_admin luôn là người thật (chống admin mạo danh) và đi
+ * đúng flow tạo implicit tenant.
+ *
+ * Dùng Set để lookup O(1) thay vì Array.includes O(n).
+ */
 const ADMIN_CREATABLE_ROLES = new Set(['admin', 'warehouse_staff', 'transport_staff']);
 
-// Map DB row -> domain object (camelCase cho phía API)
+/**
+ * Map 1 row từ Postgres (snake_case) sang domain object (camelCase) cho API.
+ *
+ * Lưu ý:
+ * - Trả `tenantId`/`branchId` = null thay vì undefined để FE xử lý nhất quán.
+ * - `status` được derive từ `is_active` để backward-compatible với FE cũ
+ *   đang đọc `status` ('active' | 'inactive').
+ * - `passwordHash` vẫn được map ở đây, nhưng các handler sẽ `delete` ra
+ *   trước khi trả response — không được để lộ hash ra ngoài.
+ *
+ * @param {object} row Row từ query `SELECT * FROM users`.
+ * @returns {object|null} Domain object hoặc null nếu row falsy.
+ */
 function mapUserRow(row) {
   if (!row) return null;
   const derivedStatus = row.status ?? (row.is_active === true ? 'active' : 'inactive');
@@ -31,7 +73,30 @@ function mapUserRow(row) {
   };
 }
 
-// POST /users — Admin tạo tài khoản nội bộ (admin / warehouse_staff / transport_staff)
+/**
+ * POST /api/users — Admin tạo tài khoản nội bộ.
+ *
+ * Body yêu cầu:
+ *   - email (string, bắt buộc)
+ *   - password (string, plaintext, bắt buộc; server tự hash)
+ *   - fullName (string, bắt buộc)
+ *   - role (string, bắt buộc, phải thuộc ADMIN_CREATABLE_ROLES)
+ *   - username (string, optional, mặc định = email)
+ *   - phone (string, optional)
+ *
+ * Các response:
+ *   - 201: user mới tạo (không có passwordHash)
+ *   - 400: thiếu field hoặc role không hợp lệ
+ *   - 401/403: handler ở middleware (requireAuth, requireRoles('admin'))
+ *   - 409: email hoặc username trùng (Postgres 23505)
+ *
+ * Tenant/branch:
+ *   - Staff nội bộ không gắn tenant/branch — luôn NULL.
+ *   - `is_active` luôn TRUE (bỏ flow kích hoạt thủ công).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function createUser(req, res) {
   try {
     const {
@@ -115,7 +180,16 @@ export async function createUser(req, res) {
   }
 }
 
-// GET /users/:id
+/**
+ * GET /api/users/:id — Chi tiết user theo ID.
+ *
+ * Hiện tại không yêu cầu auth (endpoint mở). Roadmap sẽ bổ sung
+ * requireAuth + cho phép tenant_admin chỉ xem user thuộc tenant mình.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns 200 user | 404 nếu không tồn tại
+ */
 export async function getUserById(req, res) {
   try {
     const { id } = req.params;
@@ -139,7 +213,19 @@ export async function getUserById(req, res) {
   }
 }
 
-// GET /users?status=active&limit=50&offset=0
+/**
+ * GET /api/users — List user có phân trang, filter theo status.
+ *
+ * Query params:
+ *   - status: 'active' | 'inactive' (optional) — map sang is_active.
+ *   - limit: số (mặc định 50).
+ *   - offset: số (mặc định 0).
+ *
+ * Sort cố định theo created_at DESC. Không expose cột hash.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function listUsers(req, res) {
   try {
     const { status } = req.query;
@@ -177,7 +263,24 @@ export async function listUsers(req, res) {
   }
 }
 
-// PATCH /users/:id
+/**
+ * PATCH /api/users/:id — Cập nhật hồ sơ user (admin-only).
+ *
+ * Body optional fields (gửi ít nhất 1):
+ *   - email, fullName, phone, role
+ *
+ * Giới hạn:
+ *   - Nếu có `role` thì phải nằm trong ADMIN_CREATABLE_ROLES (không cho
+ *     đẩy user lên `tenant_admin` qua PATCH để tránh mạo danh).
+ *   - Không nhận password/passwordHash (đổi mật khẩu qua flow auth riêng).
+ *   - Không nhận isActive/status (toggle active qua DELETE + restore).
+ *
+ * SQL động: chỉ build SET clause cho các field thực sự có trong body.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns 200 user | 400 nếu body rỗng hoặc role sai | 404 nếu id không tồn tại
+ */
 export async function updateUser(req, res) {
   try {
     const { id } = req.params;
@@ -252,7 +355,19 @@ export async function updateUser(req, res) {
   }
 }
 
-// POST /users/:id/restore - Kích hoạt lại account đã bị soft-delete (admin)
+/**
+ * POST /api/users/:id/restore — Kích hoạt lại user đã bị soft delete (admin-only).
+ *
+ * Flow:
+ *   1. SELECT user_id, is_active FROM users WHERE user_id = $1.
+ *   2. Nếu không tìm thấy → 404.
+ *   3. Nếu đang active → 409 (idempotent-safe, không phá state).
+ *   4. UPDATE is_active = true, updated_at = NOW().
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns 200 { message, user } | 404 | 409
+ */
 export async function restoreUser(req, res) {
   try {
     const { id } = req.params;
@@ -288,7 +403,19 @@ export async function restoreUser(req, res) {
   }
 }
 
-// DELETE /users/:id - Deactivate account (admin)
+/**
+ * DELETE /api/users/:id — Soft deactivate user (admin-only).
+ *
+ * Không xoá row — chỉ flip `is_active = false` để giữ referential
+ * integrity (các bảng contracts, invoices, rental_requests có thể
+ * tham chiếu user này).
+ *
+ * Để kích hoạt lại: POST /api/users/:id/restore.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns 200 { message, user } | 404
+ */
 export async function deleteUser(req, res) {
   try {
     const { id } = req.params;

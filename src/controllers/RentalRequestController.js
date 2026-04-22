@@ -1,3 +1,30 @@
+/**
+ * @fileoverview
+ * RentalRequestController — quản lý yêu cầu thuê kho từ tenant.
+ *
+ * Endpoints:
+ *   - POST   /api/rental-requests             Tenant admin tạo yêu cầu thuê.
+ *   - GET    /api/rental-requests             List (filter theo tenant, status).
+ *   - GET    /api/rental-requests/:id         Chi tiết.
+ *   - PATCH  /api/rental-requests/:id         Cập nhật (chỉ khi PENDING).
+ *   - POST   /api/rental-requests/:id/approve Admin/staff duyệt → tự tạo contract DRAFT.
+ *   - POST   /api/rental-requests/:id/reject  Admin/staff từ chối (bắt buộc reason).
+ *
+ * API contract quan trọng (xem ADR-005):
+ *   - FE gửi `userId` trong body thay vì `tenantId`.
+ *   - Backend resolve tenantId qua helper `resolveTenantFromUser()`.
+ *   - Nếu user chưa có tenant → 400 (tenant_admin phải verify OTP xong
+ *     để hệ thống tạo implicit tenant trước khi gửi rental request).
+ *
+ * State machine:
+ *
+ *   PENDING ───approve──► APPROVED ──► (contract DRAFT được tạo song song)
+ *      │
+ *      └────reject───► REJECTED
+ *
+ * PATCH chỉ được phép khi status = PENDING.
+ */
+
 import pool from '../config/db.js';
 import { randomUUID } from 'crypto';
 import { tableName as RENTAL_REQUEST_TABLE } from '../models/RentalRequest.js';
@@ -6,6 +33,13 @@ import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as TENANT_TABLE } from '../models/Tenant.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
+/**
+ * Chuẩn hoá giá trị ID nhận từ request: trim whitespace, convert non-string,
+ * trả null nếu rỗng để downstream code dễ xử lý ` || null`.
+ *
+ * @param {*} value
+ * @returns {string|null}
+ */
 function trimId(value) {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'string') return String(value).trim() || null;
@@ -14,8 +48,23 @@ function trimId(value) {
 }
 
 /**
- * Resolve tenantId từ userId (body) hoặc user đang đăng nhập (JWT).
- * Trả về { tenantId, userId, error? }.
+ * Resolve tenantId từ userId (ưu tiên body, fallback JWT).
+ *
+ * FE gửi `userId` trong request body (theo API contract v0.5). Nếu body
+ * không có thì dùng user đang đăng nhập (`req.user.userId`) — hữu ích
+ * khi tenant admin tự tạo rental request cho chính mình.
+ *
+ * Trường hợp lỗi trả về `{ error: <message> }`:
+ *   - Không có userId cả ở body lẫn JWT.
+ *   - userId không tồn tại trong bảng users.
+ *   - User tồn tại nhưng tenant_id NULL (chưa verify OTP, hoặc staff nội bộ
+ *     không có tenant).
+ *
+ * Trường hợp OK: `{ userId, tenantId }`.
+ *
+ * @param {string|undefined} bodyUserId
+ * @param {{ userId?: string }} reqUser payload JWT đã parse.
+ * @returns {Promise<{ userId?: string, tenantId?: string, error?: string }>}
  */
 async function resolveTenantFromUser(bodyUserId, reqUser) {
   const candidateUserId = trimId(bodyUserId) || reqUser?.userId || null;
@@ -37,7 +86,20 @@ async function resolveTenantFromUser(bodyUserId, reqUser) {
   return { userId: candidateUserId, tenantId };
 }
 
-// Map DB row -> domain object
+/**
+ * Map 1 row `rental_requests` từ Postgres (snake_case) sang domain object
+ * camelCase cho API response.
+ *
+ * Các field nghiệp vụ trọng tâm:
+ *   - rentalTermUnit / rentalTermValue: FE nhập "thuê 3 tháng" → giữ cả
+ *     unit và value, không ép về days, để UI hiển thị đúng ngôn ngữ.
+ *   - durationDays: giá trị đã normalize sang ngày, dùng cho report/filter.
+ *   - goodsWeightKg: expected weight của lô hàng sẽ nhập vào kho.
+ *   - approvedBy / rejectedReason: audit trail ai duyệt / lý do từ chối.
+ *
+ * @param {object} row
+ * @returns {object|null}
+ */
 function mapRentalRequestRow(row) {
   if (!row) return null;
   return {
@@ -63,6 +125,23 @@ function mapRentalRequestRow(row) {
   };
 }
 
+/**
+ * Quy đổi thời hạn thuê (unit + value) sang số ngày để lưu vào DB cho
+ * mục đích so sánh / filter.
+ *
+ * Quy ước (đơn giản cho MVP, không phụ thuộc calendar thật):
+ *   - MONTH   → 30 ngày
+ *   - QUARTER → 90 ngày
+ *   - YEAR    → 365 ngày
+ *
+ * Lý do không dùng date-fns/dayjs: giá trị này chỉ dùng cho report
+ * gần đúng, không phải tính tiền. Tiền tính theo start_date/end_date
+ * thực tế ở contract.
+ *
+ * @param {string} rentalTermUnit
+ * @param {number|string} rentalTermValue
+ * @returns {number} Số ngày tương ứng.
+ */
 function calculateDurationDays(rentalTermUnit, rentalTermValue) {
   const normalizedUnit = String(rentalTermUnit || '').toUpperCase();
   const unitToDays = {
@@ -73,6 +152,19 @@ function calculateDurationDays(rentalTermUnit, rentalTermValue) {
   return unitToDays[normalizedUnit] * Number(rentalTermValue);
 }
 
+/**
+ * Validate payload cho CREATE / UPDATE rental request.
+ *
+ * CREATE: các field trong `required` đều bắt buộc.
+ * UPDATE: chỉ validate các field có mặt (partial update), nhưng nếu
+ * gửi field thì giá trị phải hợp lệ.
+ *
+ * Trả về mảng lỗi `[{ field, reason }]`. Nếu rỗng thì payload OK.
+ *
+ * @param {object} payload
+ * @param {{ isUpdate?: boolean }} options
+ * @returns {Array<{ field: string, reason: string }>}
+ */
 function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   const required = [
     'customerType',
@@ -133,6 +225,18 @@ function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   return null;
 }
 
+/**
+ * Tìm danh sách user cần nhận thông báo khi rental request thay đổi state.
+ *
+ * Bao gồm:
+ *   - Tenant admin của tenant sở hữu request (được thông báo khi approve/reject).
+ *   - Admin nội bộ / warehouse_staff của kho đang được thuê (được thông báo
+ *     khi có request mới PENDING).
+ *
+ * @param {import('pg').PoolClient} client Transaction client.
+ * @param {object} rentalRequestRow Row rental_requests.
+ * @returns {Promise<string[]>} Mảng user_id.
+ */
 async function findNotifiedUserIds(client, rentalRequestRow) {
   const result = new Set();
   if (rentalRequestRow.tenant_id) {
@@ -146,6 +250,18 @@ async function findNotifiedUserIds(client, rentalRequestRow) {
   return Array.from(result);
 }
 
+/**
+ * Bulk insert notifications cho nhiều user cùng lúc.
+ *
+ * Dùng 1 INSERT với nhiều value tuple thay vì loop (giảm round-trip DB).
+ * Mỗi notification được tạo trong cùng transaction với action nghiệp vụ
+ * gốc — nếu action fail thì notification cũng rollback, tránh gửi
+ * thông báo về event chưa xảy ra.
+ *
+ * @param {import('pg').PoolClient} client
+ * @param {string[]} userIds
+ * @param {{ type: string, title: string, content: string }} payload
+ */
 async function createNotifications(client, userIds, { type, title, content }) {
   for (const userId of userIds) {
     await client.query(
@@ -159,6 +275,26 @@ async function createNotifications(client, userIds, { type, title, content }) {
 }
 
 // POST /rental-requests - Tạo rental request mới
+/**
+ * POST /api/rental-requests — Tenant tạo yêu cầu thuê kho mới.
+ *
+ * Flow (transaction):
+ *   1. Resolve tenantId từ userId (body) hoặc JWT.
+ *   2. Validate payload (customerType, warehouseId, rentalType, term, goods).
+ *   3. Sinh request_id theo pattern RR####.
+ *   4. Tính durationDays.
+ *   5. INSERT rental_requests với status = PENDING.
+ *   6. Tìm user cần notify (tenant admin + warehouse staff) và insert notifications.
+ *   7. COMMIT, trả 201.
+ *
+ * Các check business:
+ *   - warehouseId phải tồn tại (FK constraint).
+ *   - rentalType phải là RACK hoặc LEVEL.
+ *   - rentalTermValue > 0.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function createRentalRequest(req, res) {
   const {
     customerType,
@@ -285,6 +421,23 @@ export async function createRentalRequest(req, res) {
 }
 
 // GET /rental-requests - Danh sách rental requests
+/**
+ * GET /api/rental-requests — List rental request có phân trang + filter.
+ *
+ * Query params:
+ *   - userId: filter theo user (resolve ra tenantId rồi filter).
+ *   - status: PENDING | APPROVED | REJECTED.
+ *   - warehouseId: filter theo kho.
+ *   - limit, offset.
+ *
+ * Tenant isolation: nếu req.user.role = tenant_admin thì tự động thêm
+ * `WHERE tenant_id = <JWT tenantId>`. Admin / staff không bị filter.
+ *
+ * Sort theo created_at DESC để request mới nhất lên đầu.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function listRentalRequests(req, res) {
   try {
     const { page = 1, limit = 10, status, userId } = req.query;
@@ -357,6 +510,15 @@ export async function listRentalRequests(req, res) {
 }
 
 // GET /rental-requests/:id - Lấy chi tiết rental request
+/**
+ * GET /api/rental-requests/:id — Chi tiết 1 rental request.
+ *
+ * Response 200: domain object đã map.
+ * Response 404: không tồn tại.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function getRentalRequestById(req, res) {
   try {
     const { id } = req.params;
@@ -383,6 +545,20 @@ export async function getRentalRequestById(req, res) {
 }
 
 // PATCH /rental-requests/:id - Cập nhật rental request
+/**
+ * PATCH /api/rental-requests/:id — Cập nhật rental request.
+ *
+ * Ràng buộc quan trọng: **chỉ update được khi status = PENDING**. Sau khi
+ * đã approved/rejected, yêu cầu coi như khép, phải tạo request mới nếu
+ * muốn thay đổi (tránh lẫn lộn audit trail).
+ *
+ * Payload: tất cả field đều optional; partial update.
+ *
+ * Nếu đổi rentalTermUnit/rentalTermValue → recalc durationDays.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function updateRentalRequest(req, res) {
   try {
     const { id } = req.params;
@@ -497,6 +673,22 @@ export async function updateRentalRequest(req, res) {
 }
 
 // POST /rental-requests/:id/approve - Approve rental request
+/**
+ * POST /api/rental-requests/:id/approve — Admin/warehouse_staff duyệt request.
+ *
+ * Flow (transaction):
+ *   1. SELECT rental_request FOR UPDATE (khoá row).
+ *   2. Kiểm tra status = PENDING (nếu không → 409 "state không hợp lệ").
+ *   3. UPDATE status = APPROVED, approved_by = req.user.userId, approved_at = NOW().
+ *   4. (Roadmap) Tạo contract DRAFT tương ứng và link qua request_id.
+ *   5. Gửi notification cho tenant owner.
+ *   6. COMMIT.
+ *
+ * Response 200: request đã approve (kèm contract nếu đã tạo).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function approveRentalRequest(req, res) {
   const client = await pool.connect();
   try {
@@ -544,6 +736,19 @@ export async function approveRentalRequest(req, res) {
 }
 
 // POST /rental-requests/:id/reject - Reject rental request
+/**
+ * POST /api/rental-requests/:id/reject — Admin/warehouse_staff từ chối request.
+ *
+ * Flow (transaction):
+ *   1. Validate body: `reason` bắt buộc (tenant có quyền biết lý do).
+ *   2. SELECT FOR UPDATE + kiểm tra PENDING.
+ *   3. UPDATE status = REJECTED, rejected_reason = reason, rejected_at = NOW().
+ *   4. Gửi notification cho tenant owner kèm reason.
+ *   5. COMMIT.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 export async function rejectRentalRequest(req, res) {
   const client = await pool.connect();
   try {

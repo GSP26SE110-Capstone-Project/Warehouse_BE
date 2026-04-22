@@ -1,3 +1,22 @@
+/**
+ * @fileoverview
+ * AuthController — phụ trách toàn bộ flow nhận dạng người dùng:
+ *
+ *   - POST /api/auth/register              Tạo tài khoản mới (mặc định tenant_admin).
+ *   - POST /api/auth/verify-register-otp   Xác thực OTP email + tạo implicit tenant + cấp JWT.
+ *   - POST /api/auth/login                 Đăng nhập bằng email+password, trả JWT.
+ *   - POST /api/auth/forgot-password       Gửi OTP reset password qua email.
+ *   - POST /api/auth/reset-password        Đổi mật khẩu sau khi OTP verified.
+ *
+ * Nguyên tắc (chi tiết ở docs/ARCHITECTURE.md):
+ *   - Password plaintext → bcrypt hash bằng BCRYPT_SALT_ROUNDS = 10 trước khi lưu DB.
+ *   - OTP 6 số, TTL 5 phút, lưu ở bảng `user_otps` với flag `used`.
+ *   - Khi register tenant_admin, backend auto-tạo record `tenants` ngầm
+ *     (để các bảng nghiệp vụ luôn có tenant_id hợp lệ — xem ADR-004).
+ *   - Hoạt động ghi nhiều bảng đều bọc trong transaction (BEGIN/COMMIT/ROLLBACK).
+ *   - Dùng `randomUUID` chỉ cho legacy random (không phải PK chính) — PK chính theo pattern TN####/USR####.
+ */
+
 import pool from '../config/db.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as OTP_TABLE } from '../models/UserOtp.js';
@@ -9,7 +28,17 @@ import { signAccessToken } from '../services/JwtService.js';
 
 /**
  * Sinh tenant_id kế tiếp theo pattern TN#### trong cùng transaction.
- * Dùng client thay pool để tránh race condition khi register song song.
+ *
+ * Nhận `client` đã BEGIN thay vì pool để đảm bảo truy vấn MAX
+ * và INSERT nằm cùng 1 snapshot transaction — tránh race condition
+ * khi 2 request register cùng lúc đọc trùng giá trị MAX.
+ *
+ * Edge case: bảng tenants có rows `TN0001`, `TN0003` (lẫn legacy id không
+ * match pattern) — regex `^TN[0-9]+$` loại bỏ những id không chuẩn để
+ * không sinh ID kế tiếp bị chồng lên record legacy.
+ *
+ * @param {import('pg').PoolClient} client
+ * @returns {Promise<string>} ID dạng `TN####`.
  */
 async function generateNextTenantId(client) {
   const { rows } = await client.query(
@@ -24,8 +53,23 @@ async function generateNextTenantId(client) {
 
 /**
  * Auto-tạo tenant "ngầm" từ thông tin user khi register tenant_admin.
- * Giấu khái niệm tenant khỏi API public. Dữ liệu là placeholder, có thể
- * bổ sung sau bằng endpoint cập nhật hồ sơ công ty (nếu thêm về sau).
+ *
+ * Lý do tồn tại (xem ADR-004): FE muốn giấu khái niệm tenant khỏi UI,
+ * nhưng DB schema yêu cầu mọi user nghiệp vụ phải có tenant_id (NOT NULL
+ * trong rental_requests, contracts, shipments…). Giải pháp: khi user
+ * tenant_admin verify OTP → backend tạo 1 tenant placeholder gán kèm.
+ *
+ * Dữ liệu placeholder:
+ *   - company_name = fullName (hoặc email nếu không có fullName).
+ *   - tax_code = `IND-<userId>` — đảm bảo UNIQUE + dễ nhận dạng individual.
+ *   - contact_email = email đăng ký.
+ *   - address = NULL (tenant sẽ update sau).
+ *
+ * Toàn bộ được thực hiện trong cùng client đang BEGIN để đảm bảo atomic.
+ *
+ * @param {import('pg').PoolClient} client Transaction client đã BEGIN.
+ * @param {{ userId: string, email: string, phone?: string, fullName?: string }} payload
+ * @returns {Promise<string>} `tenant_id` vừa tạo.
  */
 async function createImplicitTenantForUser(client, { userId, email, phone, fullName }) {
   const tenantId = await generateNextTenantId(client);
@@ -44,7 +88,20 @@ async function createImplicitTenantForUser(client, { userId, email, phone, fullN
   return tenantId;
 }
 
-// Map DB row -> domain object
+/**
+ * Chuyển row `users` từ Postgres sang domain object camelCase.
+ *
+ * Giống `UserController.mapUserRow` nhưng không bao gồm `tenantId`/`branchId`
+ * vì các endpoint của AuthController không cần expose hai field này ra
+ * trong response login/register (FE chỉ dùng userId + role để điều hướng
+ * và tenantId được nhúng trong JWT payload).
+ *
+ * LƯU Ý: trả `passwordHash` trong mapping nhưng handler phải `delete`
+ * trước khi gửi response.
+ *
+ * @param {object} row
+ * @returns {object|null}
+ */
 function mapUserRow(row) {
   if (!row) return null;
   const derivedStatus = row.status ?? (row.is_active === true ? 'active' : 'inactive');
@@ -63,19 +120,48 @@ function mapUserRow(row) {
   };
 }
 
+/**
+ * Sinh mã OTP dạng chuỗi số có độ dài cố định (mặc định 6).
+ *
+ * Dùng Math.random (không cryptographically secure) — chấp nhận cho
+ * MVP vì OTP TTL rất ngắn (5 phút) và có rate limit ở roadmap.
+ * Production grade: đổi sang `crypto.randomInt(min, max)`.
+ *
+ * @param {number} length Số chữ số (mặc định 6).
+ * @returns {string} Chuỗi số 6 ký tự.
+ */
 function generateOtp(length = 6) {
   const min = 10 ** (length - 1);
   const max = 10 ** length - 1;
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
-/** Map FE / legacy role sang giá trị hợp lệ với CHECK constraint trong init-scripts (vd: tenant_admin). */
+/**
+ * Chuẩn hoá role từ FE thành giá trị hợp lệ với CHECK constraint ở DB.
+ *
+ * Lý do: FE (và version cũ của API) có thể gửi `role = 'tenant'` nhưng
+ * schema DB chỉ chấp nhận `tenant_admin`. Map ở đây thay vì ép FE đổi
+ * để tránh breaking change.
+ *
+ * @param {string|undefined} role
+ * @returns {string} Một trong 4 giá trị hợp lệ: admin, warehouse_staff,
+ *   transport_staff, tenant_admin.
+ */
 function normalizeUserRole(role) {
   if (!role || role === 'tenant') return 'tenant_admin';
   return role;
 }
 
-/** Bỏ qua rỗng hoặc placeholder mặc định của Swagger ("string") để lookup userId/email/phone đúng. */
+/**
+ * Trả về chuỗi đã trim nếu có nghĩa, ngược lại null.
+ *
+ * Hữu ích khi xử lý input từ Swagger UI — mặc định Swagger gửi chuỗi
+ * `"string"` nếu người test không sửa field. Chúng ta coi đó là không
+ * có input để tránh lookup user bằng username = "string".
+ *
+ * @param {*} value
+ * @returns {string|null}
+ */
 function usableAuthString(value) {
   if (value == null) return null;
   const s = String(value).trim();
@@ -128,6 +214,27 @@ async function resolveUserIdFromAuthIdentifiers(client, uid, em, ph) {
 
 const RESEND_REGISTER_OTP_COOLDOWN_SEC = 60;
 
+/**
+ * POST /api/auth/register — Tạo tài khoản mới + gửi OTP xác thực email.
+ *
+ * Flow:
+ *   1. Validate body: email, password, fullName (bắt buộc).
+ *   2. Normalize role → mặc định `tenant_admin`.
+ *   3. Hash password bằng bcrypt.
+ *   4. INSERT users với is_active = FALSE.
+ *   5. Sinh OTP 6 số, TTL 5 phút, INSERT vào user_otps với type='register'.
+ *   6. Gửi email qua EmailService (nếu SMTP trống thì log).
+ *   7. Trả 201 { userId, message }.
+ *
+ * Response codes:
+ *   - 201: đã gửi OTP.
+ *   - 400: thiếu field.
+ *   - 409: email hoặc phone đã được dùng.
+ *   - 500: DB/SMTP lỗi.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/register
 export async function register(req, res) {
   try {
@@ -305,6 +412,22 @@ export async function register(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/login — Đăng nhập bằng email + password, trả JWT.
+ *
+ * Flow:
+ *   1. Tìm user theo email.
+ *   2. Nếu không có → 401 (thông báo generic, không leak "email không tồn tại").
+ *   3. bcrypt.compare password — nếu sai → 401.
+ *   4. Nếu is_active = false → 403 (account bị deactivate).
+ *   5. Sign JWT với payload { userId, email, role, tenantId }.
+ *   6. Trả 200 { accessToken, user }.
+ *
+ * Không cập nhật `last_login_at` (chưa có cột) — roadmap thêm để audit.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/login
 export async function login(req, res) {
   try {
@@ -353,6 +476,27 @@ export async function login(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/verify-register-otp — Xác thực OTP + kích hoạt account +
+ * auto-tạo tenant ngầm (nếu role = tenant_admin) + trả JWT.
+ *
+ * Flow (trong 1 transaction):
+ *   1. Tìm OTP mới nhất chưa dùng với type='register' cho user.
+ *   2. Nếu không có hoặc expired → 400 "OTP không hợp lệ".
+ *   3. So sánh otp_code. Sai → 400.
+ *   4. Mark OTP used=TRUE.
+ *   5. Nếu user role=tenant_admin và chưa có tenant_id:
+ *      - gọi createImplicitTenantForUser() để sinh TN####.
+ *      - UPDATE users SET tenant_id = <new>.
+ *   6. UPDATE users SET is_active=TRUE.
+ *   7. COMMIT transaction.
+ *   8. Sign JWT, trả 200.
+ *
+ * Nếu bất kỳ bước nào lỗi → ROLLBACK, client vẫn có thể resend OTP.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/verify-register-otp
 export async function verifyRegisterOtp(req, res) {
   try {
@@ -506,6 +650,22 @@ export async function verifyRegisterOtp(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/resend-register-otp — Gửi lại OTP register.
+ *
+ * Rate limit: chỉ cho gửi lại sau RESEND_REGISTER_OTP_COOLDOWN_SEC giây
+ * kể từ lần gửi gần nhất (chống spam email). Nếu gửi quá nhanh → 429.
+ *
+ * Flow:
+ *   1. Tìm user qua userId / email / phone (khả dụng).
+ *   2. Kiểm tra user chưa active (nếu active rồi thì không cần OTP nữa → 400).
+ *   3. Kiểm tra OTP gần nhất: nếu < cooldown → 429.
+ *   4. Sinh OTP mới, INSERT vào user_otps, gửi email.
+ *   5. Trả 200 { message }.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/resend-register-otp
 export async function resendRegisterOtp(req, res) {
   try {
@@ -626,6 +786,22 @@ export async function resendRegisterOtp(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/forgot-password — Gửi OTP reset mật khẩu qua email.
+ *
+ * Security consideration: luôn trả 200 dù email có tồn tại hay không —
+ * chống enumeration attack (attacker dò email nào đã register).
+ *
+ * Flow:
+ *   1. Tìm user theo email.
+ *   2. Nếu không có → trả 200 generic (không cho biết email không tồn tại).
+ *   3. Sinh OTP, INSERT user_otps với type='forgot_password'.
+ *   4. Gửi email reset OTP.
+ *   5. Trả 200 { message }.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/forgot-password
 export async function forgotPassword(req, res) {
   try {
@@ -691,6 +867,26 @@ export async function forgotPassword(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/reset-password — Đổi mật khẩu sau khi có OTP forgot-password.
+ *
+ * Flow (1 transaction):
+ *   1. Validate body: email, otp, newPassword.
+ *   2. Tìm user theo email.
+ *   3. Tìm OTP mới nhất chưa dùng với type='forgot_password'.
+ *   4. Kiểm tra match + chưa expired.
+ *   5. Mark OTP used=TRUE.
+ *   6. Hash newPassword và UPDATE users SET password_hash=….
+ *   7. COMMIT.
+ *
+ * Response codes:
+ *   - 200: đổi password thành công.
+ *   - 400: OTP sai / hết hạn, hoặc thiếu field.
+ *   - 404: email không tồn tại.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
 // POST /auth/reset-password
 export async function resetPassword(req, res) {
   try {
