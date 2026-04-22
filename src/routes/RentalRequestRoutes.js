@@ -29,7 +29,6 @@ router.use(requireAuth);
  *             type: object
  *             required:
  *               - customerType
- *               - tenantId
  *               - warehouseId
  *               - rentalType
  *               - requestedStartDate
@@ -42,9 +41,9 @@ router.use(requireAuth);
  *               customerType:
  *                 type: string
  *                 enum: [individual, business]
- *               tenantId:
+ *               userId:
  *                 type: string
- *                 description: Bắt buộc. Tenant tạo yêu cầu
+ *                 description: User đại diện tenant tạo yêu cầu. Nếu bỏ trống, sẽ lấy từ JWT (user đang đăng nhập). Server tự resolve về tenantId.
  *               warehouseId:
  *                 type: string
  *               rentalType:
@@ -101,7 +100,8 @@ router.post('/', requireRoles('tenant', 'tenant_admin', 'admin'), createRentalRe
  *           type: string
  *           enum: [PENDING, APPROVED, REJECTED]
  *       - in: query
- *         name: tenantId
+ *         name: userId
+ *         description: Lọc các request thuộc tenant của user này
  *         schema:
  *           type: string
  *     responses:
@@ -159,8 +159,9 @@ router.get('/:id', requireRoles('tenant', 'tenant_admin', 'admin', 'warehouse_st
  *               customerType:
  *                 type: string
  *                 enum: [individual, business]
- *               tenantId:
+ *               userId:
  *                 type: string
+ *                 description: Đổi sang user khác (tenant_id sẽ được resolve lại). Optional.
  *               warehouseId:
  *                 type: string
  *               rentalType:
