@@ -16,10 +16,13 @@ const router = express.Router();
  * /api/users:
  *   post:
  *     tags: [Users]
- *     summary: Admin tạo tài khoản tenant_admin
+ *     summary: Admin tạo tài khoản nội bộ (admin / warehouse_staff / transport_staff)
  *     description: |
- *       Chỉ dùng cho admin hệ thống tạo user quản trị tenant (`role` luôn là `tenant_admin` trên server).
- *       `userId` không gửi trong body — server sinh. Cần JWT admin (`bearerAuth`).
+ *       Chỉ `admin` đăng nhập được phép gọi. Dùng để tạo tài khoản nội bộ cho admin khác
+ *       hoặc nhân viên kho/giao vận. Không tạo được `tenant_admin` — end-user phải tự
+ *       register qua `POST /api/auth/register` (có xác thực OTP/email).
+ *       `userId` không gửi trong body — server sinh. Mật khẩu gửi plaintext ở `password`,
+ *       server tự hash bằng bcrypt.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -30,49 +33,42 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - email
- *               - passwordHash
+ *               - password
  *               - fullName
- *               - tenantId
+ *               - role
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
- *                 example: admin_kh@congty.com
- *               passwordHash:
+ *                 example: staff_kho@congty.com
+ *               password:
  *                 type: string
- *                 description: Chuỗi mật khẩu đã hash (bcrypt), do client hoặc BFF hash trước khi gọi API
- *                 example: $2b$10$abcdefghijklmnopqrstuv
+ *                 format: password
+ *                 minLength: 6
+ *                 description: Plaintext password. Server tự hash bằng bcrypt.
+ *                 example: Password@123
  *               fullName:
  *                 type: string
  *                 example: Nguyễn Văn A
- *               tenantId:
+ *               role:
  *                 type: string
- *                 description: Mã tenant (FK `tenants.tenant_id`) mà tenant_admin này thuộc về
- *                 example: TEN001
+ *                 enum: [admin, warehouse_staff, transport_staff]
+ *                 description: |
+ *                   Role của tài khoản tạo mới. Whitelist: `admin`, `warehouse_staff`,
+ *                   `transport_staff`. Không chấp nhận `tenant_admin`.
+ *                 example: warehouse_staff
  *               username:
  *                 type: string
  *                 description: Đăng nhập; nếu bỏ qua thì mặc định bằng `email`
- *                 example: admin_kh
- *               branchId:
- *                 type: string
- *                 nullable: true
- *                 description: Chi nhánh gắn tùy chọn (FK `branches.branch_id`)
+ *                 example: staff_kho
  *               phone:
  *                 type: string
  *                 nullable: true
- *               isActive:
- *                 type: boolean
- *                 default: true
- *                 description: Tài khoản kích hoạt ngay (mặc định true)
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *                 description: Nếu gửi thì ưu tiên hơn `isActive` (active = true, inactive = false)
  *     responses:
  *       201:
- *         description: Đã tạo tenant_admin (response không chứa passwordHash)
+ *         description: Đã tạo user nội bộ (response không chứa password/passwordHash)
  *       400:
- *         description: Thiếu field bắt buộc, tenant/branch không tồn tại
+ *         description: Thiếu field bắt buộc hoặc role không hợp lệ
  *       401:
  *         description: Chưa đăng nhập
  *       403:
@@ -151,9 +147,11 @@ router.get('/:id', getUserById);
  *               status:
  *                 type: string
  *                 enum: [active, inactive]
- *               passwordHash:
+ *               password:
  *                 type: string
- *                 description: Chuỗi hash mật khẩu (bcrypt) nếu đổi mật khẩu
+ *                 format: password
+ *                 minLength: 6
+ *                 description: Plaintext password mới. Server tự hash bằng bcrypt.
  *     responses:
  *       200:
  *         description: User updated

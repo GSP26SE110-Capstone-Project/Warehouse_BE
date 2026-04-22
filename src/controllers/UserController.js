@@ -1,6 +1,14 @@
 import pool from '../config/db.js';
+import bcrypt from 'bcrypt';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
+
+const BCRYPT_SALT_ROUNDS = 10;
+
+// Role mà admin được phép tạo qua POST /api/users.
+// `tenant_admin` KHÔNG nằm trong whitelist: người dùng end-customer phải tự register
+// qua /api/auth/register để xác thực email/OTP, admin không tạo thay.
+const ADMIN_CREATABLE_ROLES = new Set(['admin', 'warehouse_staff', 'transport_staff']);
 
 // Map DB row -> domain object (camelCase cho phía API)
 function mapUserRow(row) {
@@ -23,55 +31,40 @@ function mapUserRow(row) {
   };
 }
 
-// POST /users — Admin tạo tài khoản tenant_admin (gắn tenant)
+// POST /users — Admin tạo tài khoản nội bộ (admin / warehouse_staff / transport_staff)
 export async function createUser(req, res) {
   try {
     const {
       email,
-      passwordHash,
+      password,
       fullName,
-      tenantId,
+      role,
       username: usernameBody,
-      branchId = null,
       phone = null,
-      isActive = true,
-      status,
     } = req.body;
 
     const emailTrim = typeof email === 'string' ? email.trim() : '';
     const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
-    const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
+    const passwordStr = typeof password === 'string' ? password : '';
+    const roleTrim = typeof role === 'string' ? role.trim() : '';
     const usernameTrim =
       typeof usernameBody === 'string' && usernameBody.trim()
         ? usernameBody.trim()
         : emailTrim;
 
-    if (!emailTrim || !passwordHash || !fullNameTrim || !tenantIdTrim) {
+    if (!emailTrim || !passwordStr || !fullNameTrim || !roleTrim) {
       return res.status(400).json({
-        message: 'Thiếu thông tin: email, passwordHash, fullName và tenantId là bắt buộc',
+        message: 'Thiếu thông tin: email, password, fullName và role là bắt buộc',
       });
     }
 
-    const { rows: tenantRows } = await pool.query(
-      `SELECT 1 FROM tenants WHERE tenant_id = $1 LIMIT 1`,
-      [tenantIdTrim],
-    );
-    if (tenantRows.length === 0) {
-      return res.status(400).json({ message: 'Không tồn tại tenant với tenantId đã gửi' });
+    if (!ADMIN_CREATABLE_ROLES.has(roleTrim)) {
+      return res.status(400).json({
+        message: `role không hợp lệ. Admin chỉ được tạo: ${[...ADMIN_CREATABLE_ROLES].join(', ')}. Với tenant_admin, end-user phải tự register.`,
+      });
     }
 
-    if (branchId) {
-      const { rows: br } = await pool.query(
-        `SELECT 1 FROM branches WHERE branch_id = $1 LIMIT 1`,
-        [branchId],
-      );
-      if (br.length === 0) {
-        return res.status(400).json({ message: 'Không tồn tại chi nhánh với branchId đã gửi' });
-      }
-    }
-
-    const active =
-      status !== undefined ? status === 'active' : Boolean(isActive);
+    const passwordHash = await bcrypt.hash(passwordStr, BCRYPT_SALT_ROUNDS);
 
     const userId = await generatePrefixedId(pool, {
       tableName: USER_TABLE,
@@ -79,6 +72,9 @@ export async function createUser(req, res) {
       prefix: 'USR',
     });
 
+    // Staff nội bộ (admin/warehouse_staff/transport_staff) không thuộc tenant/branch
+    // cụ thể nên tenant_id và branch_id để NULL. is_active mặc định TRUE vì mọi
+    // tài khoản tạo mới phải luôn hoạt động được (không còn flow kích hoạt thủ công).
     const query = `
       INSERT INTO ${USER_TABLE} (
         user_id,
@@ -92,21 +88,18 @@ export async function createUser(req, res) {
         role,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, NULL, NULL, $2, $3, $4, $5, $6, $7, TRUE)
       RETURNING *;
     `;
 
     const values = [
       userId,
-      tenantIdTrim,
-      branchId || null,
       usernameTrim,
       emailTrim,
       passwordHash,
       fullNameTrim,
       phone || null,
-      'tenant_admin',
-      active,
+      roleTrim,
     ];
 
     const { rows } = await pool.query(query, values);
@@ -116,9 +109,6 @@ export async function createUser(req, res) {
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ message: 'Email hoặc username đã tồn tại' });
-    }
-    if (err.code === '23503') {
-      return res.status(400).json({ message: 'Dữ liệu tham chiếu không hợp lệ (tenant/branch)' });
     }
     console.error('Error creating user:', err);
     return res.status(500).json({ message: 'Internal server error' });
@@ -198,7 +188,7 @@ export async function updateUser(req, res) {
       role,
       status,
       isActive,
-      passwordHash, // đã hash sẵn nếu có đổi mật khẩu
+      password, // plaintext, server tự hash bằng bcrypt
     } = req.body;
 
     const allowedFieldsMap = {
@@ -212,6 +202,11 @@ export async function updateUser(req, res) {
     const setClauses = [];
     const values = [];
     let index = 1;
+
+    const passwordHash =
+      typeof password === 'string' && password.length > 0
+        ? await bcrypt.hash(password, BCRYPT_SALT_ROUNDS)
+        : undefined;
 
     const fields = { email, fullName, phone, role, passwordHash };
 
