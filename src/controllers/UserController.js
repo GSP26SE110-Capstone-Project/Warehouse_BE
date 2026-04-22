@@ -255,6 +255,42 @@ export async function updateUser(req, res) {
   }
 }
 
+// POST /users/:id/restore - Kích hoạt lại account đã bị soft-delete (admin)
+export async function restoreUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    const { rows } = await pool.query(
+      `SELECT user_id, is_active FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+      [id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (rows[0].is_active === true) {
+      return res.status(409).json({ message: 'User đang active, không cần restore' });
+    }
+
+    const { rows: updated } = await pool.query(
+      `UPDATE ${USER_TABLE}
+          SET is_active = true, updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *`,
+      [id],
+    );
+    const user = mapUserRow(updated[0]);
+    delete user.passwordHash;
+
+    return res.json({
+      message: 'Account restored successfully',
+      user,
+    });
+  } catch (err) {
+    console.error('Error restoring user:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 // DELETE /users/:id - Deactivate account (admin)
 export async function deleteUser(req, res) {
   try {
@@ -288,6 +324,7 @@ export default {
   getUserById,
   listUsers,
   updateUser,
+  restoreUser,
   deleteUser,
 };
 

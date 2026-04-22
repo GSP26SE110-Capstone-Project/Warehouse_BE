@@ -5,6 +5,7 @@ import {
   getUserById,
   listUsers,
   updateUser,
+  restoreUser,
   deleteUser,
 } from '../controllers/UserController.js';
 
@@ -148,6 +149,38 @@ router.get('/:id', getUserById);
  *         description: User updated
  */
 router.patch('/:id', updateUser);
+
+// Kích hoạt lại account đã bị soft-delete (admin)
+/**
+ * @swagger
+ * /api/users/{id}/restore:
+ *   post:
+ *     tags: [Users]
+ *     summary: Kích hoạt lại account user đã bị vô hiệu hoá (admin-only)
+ *     description: |
+ *       Flip `is_active` từ `false` về `true` cho user đã bị `DELETE /api/users/{id}`
+ *       (soft deactivate). Idempotent: gọi khi user đang active sẽ trả 409.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Account restored successfully
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải admin
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: User đang active, không cần restore
+ */
+router.post('/:id/restore', requireAuth, requireRoles('admin'), restoreUser);
 
 // Vô hiệu hóa account (admin)
 /**
