@@ -5,6 +5,7 @@ import {
   getUserById,
   listUsers,
   updateUser,
+  restoreUser,
   deleteUser,
 } from '../controllers/UserController.js';
 
@@ -116,7 +117,9 @@ router.get('/:id', getUserById);
  * /api/users/{id}:
  *   patch:
  *     tags: [Users]
- *     summary: Cập nhật user
+ *     summary: Cập nhật thông tin hồ sơ user (admin-only)
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -124,10 +127,13 @@ router.get('/:id', getUserById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: false
+ *       required: true
  *       description: |
- *         Ít nhất một field. Để kích hoạt lại user sau DELETE (soft deactivate), gửi `isActive: true` hoặc `status: "active"`.
- *         `status` chỉ nhận `active` | `inactive` (ánh xạ sang cột `is_active` trong DB).
+ *         Ít nhất một field. PATCH chỉ cập nhật hồ sơ (email, fullName, phone, role).
+ *         Các thao tác khác đi qua endpoint chuyên trách:
+ *         - Đổi mật khẩu: `POST /api/auth/forgot-password` -> `POST /api/auth/reset-password`.
+ *         - Vô hiệu hoá: `DELETE /api/users/{id}`.
+ *         - Kích hoạt lại: `POST /api/users/{id}/restore`.
  *       content:
  *         application/json:
  *           schema:
@@ -141,22 +147,55 @@ router.get('/:id', getUserById);
  *                 type: string
  *               role:
  *                 type: string
- *               isActive:
- *                 type: boolean
- *                 description: true = kích hoạt, false = vô hiệu (ưu tiên hơn `status` nếu gửi cả hai)
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *               password:
- *                 type: string
- *                 format: password
- *                 minLength: 6
- *                 description: Plaintext password mới. Server tự hash bằng bcrypt.
+ *                 enum: [admin, warehouse_staff, transport_staff]
+ *                 description: |
+ *                   Role mới. Whitelist: `admin`, `warehouse_staff`, `transport_staff`.
+ *                   Không cho chuyển thành `tenant_admin`.
  *     responses:
  *       200:
  *         description: User updated
+ *       400:
+ *         description: Body rỗng hoặc role không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải admin
+ *       404:
+ *         description: User not found
  */
-router.patch('/:id', updateUser);
+router.patch('/:id', requireAuth, requireRoles('admin'), updateUser);
+
+// Kích hoạt lại account đã bị soft-delete (admin)
+/**
+ * @swagger
+ * /api/users/{id}/restore:
+ *   post:
+ *     tags: [Users]
+ *     summary: Kích hoạt lại account user đã bị vô hiệu hoá (admin-only)
+ *     description: |
+ *       Flip `is_active` từ `false` về `true` cho user đã bị `DELETE /api/users/{id}`
+ *       (soft deactivate). Idempotent: gọi khi user đang active sẽ trả 409.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Account restored successfully
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải admin
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: User đang active, không cần restore
+ */
+router.post('/:id/restore', requireAuth, requireRoles('admin'), restoreUser);
 
 // Vô hiệu hóa account (admin)
 /**

@@ -186,29 +186,35 @@ export async function updateUser(req, res) {
       fullName,
       phone,
       role,
-      status,
-      isActive,
-      password, // plaintext, server tự hash bằng bcrypt
     } = req.body;
 
+    // PATCH chỉ cập nhật profile. Các flow khác đi qua endpoint chuyên trách:
+    //  - Đổi mật khẩu: POST /api/auth/forgot-password -> reset-password (OTP email).
+    //  - Vô hiệu hoá: DELETE /api/users/:id.
+    //  - Kích hoạt lại: POST /api/users/:id/restore.
     const allowedFieldsMap = {
       email: 'email',
       fullName: 'full_name',
       phone: 'phone',
       role: 'role',
-      passwordHash: 'password_hash',
     };
+
+    // Nếu admin đổi role thì phải nằm trong whitelist (giống POST /api/users).
+    // Không cho đẩy lên `tenant_admin` qua PATCH để tránh mạo danh tenant.
+    if (role !== undefined) {
+      const roleTrim = typeof role === 'string' ? role.trim() : '';
+      if (!roleTrim || !ADMIN_CREATABLE_ROLES.has(roleTrim)) {
+        return res.status(400).json({
+          message: `role không hợp lệ. Chỉ được chuyển thành: ${[...ADMIN_CREATABLE_ROLES].join(', ')}.`,
+        });
+      }
+    }
 
     const setClauses = [];
     const values = [];
     let index = 1;
 
-    const passwordHash =
-      typeof password === 'string' && password.length > 0
-        ? await bcrypt.hash(password, BCRYPT_SALT_ROUNDS)
-        : undefined;
-
-    const fields = { email, fullName, phone, role, passwordHash };
+    const fields = { email, fullName, phone, role };
 
     for (const [key, dbColumn] of Object.entries(allowedFieldsMap)) {
       if (fields[key] !== undefined) {
@@ -216,19 +222,6 @@ export async function updateUser(req, res) {
         values.push(fields[key]);
         index += 1;
       }
-    }
-
-    if (isActive !== undefined) {
-      setClauses.push(`is_active = $${index}`);
-      values.push(Boolean(isActive));
-      index += 1;
-    } else if (status !== undefined) {
-      if (status !== 'active' && status !== 'inactive') {
-        return res.status(400).json({ message: 'status must be "active" or "inactive"' });
-      }
-      setClauses.push(`is_active = $${index}`);
-      values.push(status === 'active');
-      index += 1;
     }
 
     if (setClauses.length === 0) {
@@ -255,6 +248,42 @@ export async function updateUser(req, res) {
     return res.json(user);
   } catch (err) {
     console.error('Error updating user:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// POST /users/:id/restore - Kích hoạt lại account đã bị soft-delete (admin)
+export async function restoreUser(req, res) {
+  try {
+    const { id } = req.params;
+
+    const { rows } = await pool.query(
+      `SELECT user_id, is_active FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+      [id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (rows[0].is_active === true) {
+      return res.status(409).json({ message: 'User đang active, không cần restore' });
+    }
+
+    const { rows: updated } = await pool.query(
+      `UPDATE ${USER_TABLE}
+          SET is_active = true, updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *`,
+      [id],
+    );
+    const user = mapUserRow(updated[0]);
+    delete user.passwordHash;
+
+    return res.json({
+      message: 'Account restored successfully',
+      user,
+    });
+  } catch (err) {
+    console.error('Error restoring user:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -292,6 +321,7 @@ export default {
   getUserById,
   listUsers,
   updateUser,
+  restoreUser,
   deleteUser,
 };
 
