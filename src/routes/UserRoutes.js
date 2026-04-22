@@ -30,7 +30,7 @@ const router = express.Router();
  *             type: object
  *             required:
  *               - email
- *               - passwordHash
+ *               - password
  *               - fullName
  *               - tenantId
  *             properties:
@@ -38,10 +38,12 @@ const router = express.Router();
  *                 type: string
  *                 format: email
  *                 example: admin_kh@congty.com
- *               passwordHash:
+ *               password:
  *                 type: string
- *                 description: Chuỗi mật khẩu đã hash (bcrypt), do client hoặc BFF hash trước khi gọi API
- *                 example: $2b$10$abcdefghijklmnopqrstuv
+ *                 format: password
+ *                 minLength: 6
+ *                 description: Plaintext password. Server tự hash bằng bcrypt.
+ *                 example: Password@123
  *               fullName:
  *                 type: string
  *                 example: Nguyễn Văn A
@@ -70,7 +72,7 @@ const router = express.Router();
  *                 description: Nếu gửi thì ưu tiên hơn `isActive` (active = true, inactive = false)
  *     responses:
  *       201:
- *         description: Đã tạo tenant_admin (response không chứa passwordHash)
+ *         description: Đã tạo tenant_admin (response không chứa password/passwordHash)
  *       400:
  *         description: Thiếu field bắt buộc, tenant/branch không tồn tại
  *       401:
@@ -151,9 +153,11 @@ router.get('/:id', getUserById);
  *               status:
  *                 type: string
  *                 enum: [active, inactive]
- *               passwordHash:
+ *               password:
  *                 type: string
- *                 description: Chuỗi hash mật khẩu (bcrypt) nếu đổi mật khẩu
+ *                 format: password
+ *                 minLength: 6
+ *                 description: Plaintext password mới. Server tự hash bằng bcrypt.
  *     responses:
  *       200:
  *         description: User updated

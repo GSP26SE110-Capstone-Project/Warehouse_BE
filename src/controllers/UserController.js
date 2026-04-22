@@ -1,6 +1,9 @@
 import pool from '../config/db.js';
+import bcrypt from 'bcrypt';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
+
+const BCRYPT_SALT_ROUNDS = 10;
 
 // Map DB row -> domain object (camelCase cho phía API)
 function mapUserRow(row) {
@@ -28,7 +31,7 @@ export async function createUser(req, res) {
   try {
     const {
       email,
-      passwordHash,
+      password,
       fullName,
       tenantId,
       username: usernameBody,
@@ -41,16 +44,19 @@ export async function createUser(req, res) {
     const emailTrim = typeof email === 'string' ? email.trim() : '';
     const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
     const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
+    const passwordStr = typeof password === 'string' ? password : '';
     const usernameTrim =
       typeof usernameBody === 'string' && usernameBody.trim()
         ? usernameBody.trim()
         : emailTrim;
 
-    if (!emailTrim || !passwordHash || !fullNameTrim || !tenantIdTrim) {
+    if (!emailTrim || !passwordStr || !fullNameTrim || !tenantIdTrim) {
       return res.status(400).json({
-        message: 'Thiếu thông tin: email, passwordHash, fullName và tenantId là bắt buộc',
+        message: 'Thiếu thông tin: email, password, fullName và tenantId là bắt buộc',
       });
     }
+
+    const passwordHash = await bcrypt.hash(passwordStr, BCRYPT_SALT_ROUNDS);
 
     const { rows: tenantRows } = await pool.query(
       `SELECT 1 FROM tenants WHERE tenant_id = $1 LIMIT 1`,
@@ -198,7 +204,7 @@ export async function updateUser(req, res) {
       role,
       status,
       isActive,
-      passwordHash, // đã hash sẵn nếu có đổi mật khẩu
+      password, // plaintext, server tự hash bằng bcrypt
     } = req.body;
 
     const allowedFieldsMap = {
@@ -212,6 +218,11 @@ export async function updateUser(req, res) {
     const setClauses = [];
     const values = [];
     let index = 1;
+
+    const passwordHash =
+      typeof password === 'string' && password.length > 0
+        ? await bcrypt.hash(password, BCRYPT_SALT_ROUNDS)
+        : undefined;
 
     const fields = { email, fullName, phone, role, passwordHash };
 
