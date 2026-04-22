@@ -1,10 +1,48 @@
 import pool from '../config/db.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as OTP_TABLE } from '../models/UserOtp.js';
+import { tableName as TENANT_TABLE } from '../models/Tenant.js';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/EmailService.js';
 import { signAccessToken } from '../services/JwtService.js';
+
+/**
+ * Sinh tenant_id kế tiếp theo pattern TN#### trong cùng transaction.
+ * Dùng client thay pool để tránh race condition khi register song song.
+ */
+async function generateNextTenantId(client) {
+  const { rows } = await client.query(
+    `SELECT MAX(CAST(SUBSTRING(tenant_id FROM 3) AS INTEGER)) AS max_number
+     FROM ${TENANT_TABLE}
+     WHERE tenant_id ~ '^TN[0-9]+$'`,
+  );
+  const maxNumber = Number(rows[0]?.max_number ?? 0);
+  const next = Number.isNaN(maxNumber) ? 1 : maxNumber + 1;
+  return `TN${String(next).padStart(4, '0')}`;
+}
+
+/**
+ * Auto-tạo tenant "ngầm" từ thông tin user khi register tenant_admin.
+ * Giấu khái niệm tenant khỏi API public. Dữ liệu là placeholder, có thể
+ * bổ sung sau bằng endpoint cập nhật hồ sơ công ty (nếu thêm về sau).
+ */
+async function createImplicitTenantForUser(client, { userId, email, phone, fullName }) {
+  const tenantId = await generateNextTenantId(client);
+  await client.query(
+    `INSERT INTO ${TENANT_TABLE} (
+       tenant_id, company_name, tax_code, contact_email, contact_phone, address, is_active
+     ) VALUES ($1, $2, $3, $4, $5, NULL, TRUE);`,
+    [
+      tenantId,
+      fullName || email,
+      `IND-${userId}`,
+      email,
+      phone || null,
+    ],
+  );
+  return tenantId;
+}
 
 // Map DB row -> domain object
 function mapUserRow(row) {
@@ -175,8 +213,25 @@ export async function register(req, res) {
       );
       const hasUsernameColumn = usernameColumnRows.length > 0;
 
+      // Role = tenant_admin: auto-tạo tenant ngầm để các bảng nghiệp vụ
+      // (rental_requests, contracts, invoices, ...) có tenant_id NOT NULL
+      // dù FE không biết khái niệm tenant.
+      let tenantIdForUser = null;
+      if (dbRole === 'tenant_admin') {
+        tenantIdForUser = await createImplicitTenantForUser(client, {
+          userId,
+          email: emailTrim,
+          phone: phoneNorm,
+          fullName,
+        });
+      }
+
       const insertColumns = ['user_id'];
       const insertValues = [userId];
+      if (tenantIdForUser) {
+        insertColumns.push('tenant_id');
+        insertValues.push(tenantIdForUser);
+      }
       if (hasUsernameColumn) {
         insertColumns.push('username');
         insertValues.push(emailTrim);
