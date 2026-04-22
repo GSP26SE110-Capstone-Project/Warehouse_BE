@@ -199,6 +199,17 @@ export async function updateUser(req, res) {
       role: 'role',
     };
 
+    // Nếu admin đổi role thì phải nằm trong whitelist (giống POST /api/users).
+    // Không cho đẩy lên `tenant_admin` qua PATCH để tránh mạo danh tenant.
+    if (role !== undefined) {
+      const roleTrim = typeof role === 'string' ? role.trim() : '';
+      if (!roleTrim || !ADMIN_CREATABLE_ROLES.has(roleTrim)) {
+        return res.status(400).json({
+          message: `role không hợp lệ. Chỉ được chuyển thành: ${[...ADMIN_CREATABLE_ROLES].join(', ')}.`,
+        });
+      }
+    }
+
     const setClauses = [];
     const values = [];
     let index = 1;

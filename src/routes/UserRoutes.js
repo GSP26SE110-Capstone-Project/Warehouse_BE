@@ -117,7 +117,9 @@ router.get('/:id', getUserById);
  * /api/users/{id}:
  *   patch:
  *     tags: [Users]
- *     summary: Cập nhật thông tin hồ sơ user
+ *     summary: Cập nhật thông tin hồ sơ user (admin-only)
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -145,11 +147,23 @@ router.get('/:id', getUserById);
  *                 type: string
  *               role:
  *                 type: string
+ *                 enum: [admin, warehouse_staff, transport_staff]
+ *                 description: |
+ *                   Role mới. Whitelist: `admin`, `warehouse_staff`, `transport_staff`.
+ *                   Không cho chuyển thành `tenant_admin`.
  *     responses:
  *       200:
  *         description: User updated
+ *       400:
+ *         description: Body rỗng hoặc role không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải admin
+ *       404:
+ *         description: User not found
  */
-router.patch('/:id', updateUser);
+router.patch('/:id', requireAuth, requireRoles('admin'), updateUser);
 
 // Kích hoạt lại account đã bị soft-delete (admin)
 /**
