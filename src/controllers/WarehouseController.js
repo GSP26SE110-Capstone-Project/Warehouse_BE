@@ -27,6 +27,8 @@ function mapWarehouseRow(row) {
     height: row.height,
     totalArea: row.total_area,
     usableArea: row.usable_area,
+    occupiedPercent: row.occupied_percent,
+    occupancyStatus: row.occupancy_status,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -218,9 +220,11 @@ export async function createWarehouse(req, res) {
         height,
         total_area,
         usable_area,
+        occupied_percent,
+        occupancy_status,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, 'EMPTY', true)
       RETURNING *;
     `;
     const values = [

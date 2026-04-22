@@ -63,6 +63,20 @@ export const warehouseSchema = {
     required: false,
     note: 'Diện tích sử dụng được = totalArea - lối đi',
   },
+  occupiedPercent: {
+    type: 'number',
+    required: false,
+    min: 0,
+    max: 100,
+    note: 'Tỷ lệ không gian đã được thuê (%)',
+  },
+  occupancyStatus: {
+    type: 'enum',
+    enum: ['EMPTY', 'PARTIAL', 'FULL'],
+    required: false,
+    default: 'EMPTY',
+    note: 'Trạng thái lấp đầy không gian thuê của kho',
+  },
   temperatureMin: {
     type: 'number',
     required: false,
