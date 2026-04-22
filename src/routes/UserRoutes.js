@@ -16,10 +16,13 @@ const router = express.Router();
  * /api/users:
  *   post:
  *     tags: [Users]
- *     summary: Admin tạo tài khoản tenant_admin
+ *     summary: Admin tạo tài khoản nội bộ (admin / warehouse_staff / transport_staff)
  *     description: |
- *       Chỉ dùng cho admin hệ thống tạo user quản trị tenant (`role` luôn là `tenant_admin` trên server).
- *       `userId` không gửi trong body — server sinh. Cần JWT admin (`bearerAuth`).
+ *       Chỉ `admin` đăng nhập được phép gọi. Dùng để tạo tài khoản nội bộ cho admin khác
+ *       hoặc nhân viên kho/giao vận. Không tạo được `tenant_admin` — end-user phải tự
+ *       register qua `POST /api/auth/register` (có xác thực OTP/email).
+ *       `userId` không gửi trong body — server sinh. Mật khẩu gửi plaintext ở `password`,
+ *       server tự hash bằng bcrypt.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -33,11 +36,12 @@ const router = express.Router();
  *               - password
  *               - fullName
  *               - tenantId
+ *               - role
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
- *                 example: admin_kh@congty.com
+ *                 example: staff_kho@congty.com
  *               password:
  *                 type: string
  *                 format: password
@@ -49,8 +53,15 @@ const router = express.Router();
  *                 example: Nguyễn Văn A
  *               tenantId:
  *                 type: string
- *                 description: Mã tenant (FK `tenants.tenant_id`) mà tenant_admin này thuộc về
+ *                 description: Mã tenant (FK `tenants.tenant_id`) mà user thuộc về
  *                 example: TEN001
+ *               role:
+ *                 type: string
+ *                 enum: [admin, warehouse_staff, transport_staff]
+ *                 description: |
+ *                   Role của tài khoản tạo mới. Whitelist: `admin`, `warehouse_staff`,
+ *                   `transport_staff`. Không chấp nhận `tenant_admin`.
+ *                 example: warehouse_staff
  *               username:
  *                 type: string
  *                 description: Đăng nhập; nếu bỏ qua thì mặc định bằng `email`
@@ -72,9 +83,9 @@ const router = express.Router();
  *                 description: Nếu gửi thì ưu tiên hơn `isActive` (active = true, inactive = false)
  *     responses:
  *       201:
- *         description: Đã tạo tenant_admin (response không chứa password/passwordHash)
+ *         description: Đã tạo user nội bộ (response không chứa password/passwordHash)
  *       400:
- *         description: Thiếu field bắt buộc, tenant/branch không tồn tại
+ *         description: Thiếu field bắt buộc, role không hợp lệ, tenant/branch không tồn tại
  *       401:
  *         description: Chưa đăng nhập
  *       403:

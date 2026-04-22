@@ -5,6 +5,11 @@ import { generatePrefixedId } from '../utils/idGenerator.js';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
+// Role mà admin được phép tạo qua POST /api/users.
+// `tenant_admin` KHÔNG nằm trong whitelist: người dùng end-customer phải tự register
+// qua /api/auth/register để xác thực email/OTP, admin không tạo thay.
+const ADMIN_CREATABLE_ROLES = new Set(['admin', 'warehouse_staff', 'transport_staff']);
+
 // Map DB row -> domain object (camelCase cho phía API)
 function mapUserRow(row) {
   if (!row) return null;
@@ -26,7 +31,7 @@ function mapUserRow(row) {
   };
 }
 
-// POST /users — Admin tạo tài khoản tenant_admin (gắn tenant)
+// POST /users — Admin tạo tài khoản nội bộ (admin / warehouse_staff / transport_staff)
 export async function createUser(req, res) {
   try {
     const {
@@ -34,6 +39,7 @@ export async function createUser(req, res) {
       password,
       fullName,
       tenantId,
+      role,
       username: usernameBody,
       branchId = null,
       phone = null,
@@ -45,14 +51,21 @@ export async function createUser(req, res) {
     const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
     const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
     const passwordStr = typeof password === 'string' ? password : '';
+    const roleTrim = typeof role === 'string' ? role.trim() : '';
     const usernameTrim =
       typeof usernameBody === 'string' && usernameBody.trim()
         ? usernameBody.trim()
         : emailTrim;
 
-    if (!emailTrim || !passwordStr || !fullNameTrim || !tenantIdTrim) {
+    if (!emailTrim || !passwordStr || !fullNameTrim || !tenantIdTrim || !roleTrim) {
       return res.status(400).json({
-        message: 'Thiếu thông tin: email, password, fullName và tenantId là bắt buộc',
+        message: 'Thiếu thông tin: email, password, fullName, tenantId và role là bắt buộc',
+      });
+    }
+
+    if (!ADMIN_CREATABLE_ROLES.has(roleTrim)) {
+      return res.status(400).json({
+        message: `role không hợp lệ. Admin chỉ được tạo: ${[...ADMIN_CREATABLE_ROLES].join(', ')}. Với tenant_admin, end-user phải tự register.`,
       });
     }
 
@@ -111,7 +124,7 @@ export async function createUser(req, res) {
       passwordHash,
       fullNameTrim,
       phone || null,
-      'tenant_admin',
+      roleTrim,
       active,
     ];
 
