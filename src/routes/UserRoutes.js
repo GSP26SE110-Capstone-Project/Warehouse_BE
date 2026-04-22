@@ -126,8 +126,10 @@ router.get('/:id', getUserById);
  *     requestBody:
  *       required: false
  *       description: |
- *         Ít nhất một field. Để kích hoạt lại user sau DELETE (soft deactivate), gửi `isActive: true` hoặc `status: "active"`.
- *         `status` chỉ nhận `active` | `inactive` (ánh xạ sang cột `is_active` trong DB).
+ *         Ít nhất một field. Chỉ cập nhật thông tin hồ sơ — không dùng để đổi
+ *         mật khẩu (dùng `POST /api/auth/forgot-password` + `POST /api/auth/reset-password`)
+ *         và không dùng để kích hoạt/vô hiệu account (dùng `DELETE /api/users/{id}` để soft
+ *         deactivate, và endpoint restore riêng để kích hoạt lại).
  *       content:
  *         application/json:
  *           schema:
@@ -141,17 +143,6 @@ router.get('/:id', getUserById);
  *                 type: string
  *               role:
  *                 type: string
- *               isActive:
- *                 type: boolean
- *                 description: true = kích hoạt, false = vô hiệu (ưu tiên hơn `status` nếu gửi cả hai)
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *               password:
- *                 type: string
- *                 format: password
- *                 minLength: 6
- *                 description: Plaintext password mới. Server tự hash bằng bcrypt.
  *     responses:
  *       200:
  *         description: User updated

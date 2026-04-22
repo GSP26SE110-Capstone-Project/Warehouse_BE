@@ -188,27 +188,23 @@ export async function updateUser(req, res) {
       role,
       status,
       isActive,
-      password, // plaintext, server tự hash bằng bcrypt
     } = req.body;
 
+    // PATCH chỉ cập nhật profile. Đổi mật khẩu đi qua flow riêng
+    // (POST /api/auth/forgot-password -> /api/auth/reset-password bằng OTP email),
+    // tránh lẫn thao tác bảo mật vào endpoint sửa thông tin chung.
     const allowedFieldsMap = {
       email: 'email',
       fullName: 'full_name',
       phone: 'phone',
       role: 'role',
-      passwordHash: 'password_hash',
     };
 
     const setClauses = [];
     const values = [];
     let index = 1;
 
-    const passwordHash =
-      typeof password === 'string' && password.length > 0
-        ? await bcrypt.hash(password, BCRYPT_SALT_ROUNDS)
-        : undefined;
-
-    const fields = { email, fullName, phone, role, passwordHash };
+    const fields = { email, fullName, phone, role };
 
     for (const [key, dbColumn] of Object.entries(allowedFieldsMap)) {
       if (fields[key] !== undefined) {
