@@ -186,13 +186,12 @@ export async function updateUser(req, res) {
       fullName,
       phone,
       role,
-      status,
-      isActive,
     } = req.body;
 
-    // PATCH chỉ cập nhật profile. Đổi mật khẩu đi qua flow riêng
-    // (POST /api/auth/forgot-password -> /api/auth/reset-password bằng OTP email),
-    // tránh lẫn thao tác bảo mật vào endpoint sửa thông tin chung.
+    // PATCH chỉ cập nhật profile. Các flow khác đi qua endpoint chuyên trách:
+    //  - Đổi mật khẩu: POST /api/auth/forgot-password -> reset-password (OTP email).
+    //  - Vô hiệu hoá: DELETE /api/users/:id.
+    //  - Kích hoạt lại: POST /api/users/:id/restore.
     const allowedFieldsMap = {
       email: 'email',
       fullName: 'full_name',
@@ -212,19 +211,6 @@ export async function updateUser(req, res) {
         values.push(fields[key]);
         index += 1;
       }
-    }
-
-    if (isActive !== undefined) {
-      setClauses.push(`is_active = $${index}`);
-      values.push(Boolean(isActive));
-      index += 1;
-    } else if (status !== undefined) {
-      if (status !== 'active' && status !== 'inactive') {
-        return res.status(400).json({ message: 'status must be "active" or "inactive"' });
-      }
-      setClauses.push(`is_active = $${index}`);
-      values.push(status === 'active');
-      index += 1;
     }
 
     if (setClauses.length === 0) {

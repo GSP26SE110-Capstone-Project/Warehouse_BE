@@ -117,7 +117,7 @@ router.get('/:id', getUserById);
  * /api/users/{id}:
  *   patch:
  *     tags: [Users]
- *     summary: Cập nhật user
+ *     summary: Cập nhật thông tin hồ sơ user
  *     parameters:
  *       - in: path
  *         name: id
@@ -125,12 +125,13 @@ router.get('/:id', getUserById);
  *         schema:
  *           type: string
  *     requestBody:
- *       required: false
+ *       required: true
  *       description: |
- *         Ít nhất một field. Chỉ cập nhật thông tin hồ sơ — không dùng để đổi
- *         mật khẩu (dùng `POST /api/auth/forgot-password` + `POST /api/auth/reset-password`)
- *         và không dùng để kích hoạt/vô hiệu account (dùng `DELETE /api/users/{id}` để soft
- *         deactivate, và endpoint restore riêng để kích hoạt lại).
+ *         Ít nhất một field. PATCH chỉ cập nhật hồ sơ (email, fullName, phone, role).
+ *         Các thao tác khác đi qua endpoint chuyên trách:
+ *         - Đổi mật khẩu: `POST /api/auth/forgot-password` -> `POST /api/auth/reset-password`.
+ *         - Vô hiệu hoá: `DELETE /api/users/{id}`.
+ *         - Kích hoạt lại: `POST /api/users/{id}/restore`.
  *       content:
  *         application/json:
  *           schema:
