@@ -31,6 +31,11 @@ export const levelSchema = {
     min: 0,
     note: 'Trọng lượng tối đa cho tầng này (kg)',
   },
+  isRented: {
+    type: 'boolean',
+    default: false,
+    note: 'Level đang được thuê hay chưa',
+  },
   createdAt: {
     type: 'datetime',
     default: 'NOW()',

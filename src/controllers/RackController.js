@@ -14,6 +14,7 @@ function mapRackRow(row) {
     width: row.width,
     height: row.height,
     maxWeightCapacity: row.max_weight_capacity,
+    isRented: row.is_rented,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -128,7 +129,7 @@ export async function createRack(req, res) {
 // GET /racks
 export async function listRacks(req, res) {
   try {
-    const { page = 1, limit = 10, zoneId, rackSizeType, search } = req.query;
+    const { page = 1, limit = 10, zoneId, rackSizeType, search, isRented } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE 1=1';
@@ -148,6 +149,11 @@ export async function listRacks(req, res) {
     if (search) {
       whereClause += ` AND r.rack_code ILIKE $${i}`;
       filterValues.push(`%${search}%`);
+      i++;
+    }
+    if (isRented === 'true' || isRented === 'false') {
+      whereClause += ` AND r.is_rented = $${i}`;
+      filterValues.push(isRented === 'true');
       i++;
     }
 

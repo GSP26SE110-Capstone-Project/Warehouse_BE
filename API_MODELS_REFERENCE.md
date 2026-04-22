@@ -779,11 +779,23 @@ Swagger UI: cùng host + `/api-docs`
 
 ## 14) Racks (`Rack`)
 
+### `GET /api/racks`
+- **Query** — optional: `page`, `limit`, `zoneId`, `rackSizeType`, `search`, `isRented`
+- **Response `200`**
+  - `racks: array<RackResponse>`
+  - `pagination: PaginationResponse`
+
 ### `POST /api/racks`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Request body** — `zoneId`, `rackCode`, `length`, `width`, `height` bắt buộc; `rackSizeType`, `maxWeightCapacity` tùy chọn. **`rackId` server sinh (`RCK…`), không gửi trong body.**
 
 ## 15) Levels (`Level`)
+
+### `GET /api/levels`
+- **Query** — optional: `page`, `limit`, `rackId`, `isRented`
+- **Response `200`**
+  - `levels: array<LevelResponse>`
+  - `pagination: PaginationResponse`
 
 ### `POST /api/levels`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
@@ -1029,6 +1041,37 @@ Swagger UI: cùng host + `/api-docs`
   "status": "PENDING | APPROVED | COMPLETED | CANCELLED",
   "cancelReason": "string | null",
   "notes": "string | null",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `RackResponse`
+```json
+{
+  "rackId": "string",
+  "zoneId": "string",
+  "rackCode": "string",
+  "rackSizeType": "small | medium | large | null",
+  "length": "number",
+  "width": "number",
+  "height": "number",
+  "maxWeightCapacity": "number | null",
+  "isRented": "boolean",
+  "createdAt": "datetime",
+  "updatedAt": "datetime"
+}
+```
+
+### `LevelResponse`
+```json
+{
+  "levelId": "string",
+  "rackId": "string",
+  "levelNumber": "integer",
+  "heightClearance": "number | null",
+  "maxWeight": "number | null",
+  "isRented": "boolean",
   "createdAt": "datetime",
   "updatedAt": "datetime"
 }

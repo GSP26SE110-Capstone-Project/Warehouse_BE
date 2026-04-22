@@ -68,6 +68,61 @@ async function createNotification(client, userId, { type, title, content }) {
   );
 }
 
+async function getContractItemTargetIds(client, contractId) {
+  const { rows } = await client.query(
+    `
+    SELECT rack_id, level_id
+    FROM ${CONTRACT_ITEM_TABLE}
+    WHERE contract_id = $1
+    `,
+    [contractId],
+  );
+  return {
+    rackIds: [...new Set(rows.map((r) => r.rack_id).filter(Boolean))],
+    levelIds: [...new Set(rows.map((r) => r.level_id).filter(Boolean))],
+  };
+}
+
+async function syncRackAndLevelRentalStatus(client, { rackIds = [], levelIds = [] }) {
+  if (rackIds.length > 0) {
+    const rackPlaceholders = rackIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    await client.query(
+      `
+      UPDATE ${RACK_TABLE} r
+      SET is_rented = EXISTS (
+        SELECT 1
+        FROM ${CONTRACT_ITEM_TABLE} ci
+        JOIN ${CONTRACT_TABLE} c ON c.contract_id = ci.contract_id
+        WHERE ci.rack_id = r.rack_id
+          AND c.status IN ('SENT_TO_TENANT', 'SIGNED_BY_TENANT', 'ACTIVE')
+      ),
+      updated_at = CURRENT_TIMESTAMP
+      WHERE r.rack_id IN (${rackPlaceholders})
+      `,
+      rackIds,
+    );
+  }
+
+  if (levelIds.length > 0) {
+    const levelPlaceholders = levelIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    await client.query(
+      `
+      UPDATE ${LEVEL_TABLE} l
+      SET is_rented = EXISTS (
+        SELECT 1
+        FROM ${CONTRACT_ITEM_TABLE} ci
+        JOIN ${CONTRACT_TABLE} c ON c.contract_id = ci.contract_id
+        WHERE ci.level_id = l.level_id
+          AND c.status IN ('SENT_TO_TENANT', 'SIGNED_BY_TENANT', 'ACTIVE')
+      ),
+      updated_at = CURRENT_TIMESTAMP
+      WHERE l.level_id IN (${levelPlaceholders})
+      `,
+      levelIds,
+    );
+  }
+}
+
 // POST /contracts - Tạo contract mới
 export async function createContract(req, res) {
   const client = await pool.connect();
@@ -204,6 +259,7 @@ export async function createContract(req, res) {
           [randomUUID(), contractId, rentalRequest.warehouse_id, rackId, itemUnitPrice],
         );
       }
+      await syncRackAndLevelRentalStatus(client, { rackIds: uniqueRackIds, levelIds: [] });
     } else if (rentalRequest.rental_type === 'LEVEL') {
       if (!Array.isArray(selectedLevelIds) || selectedLevelIds.length === 0 || selectedRackIds.length > 0) {
         await client.query('ROLLBACK');
@@ -240,6 +296,7 @@ export async function createContract(req, res) {
           [randomUUID(), contractId, rentalRequest.warehouse_id, levelId, itemUnitPrice],
         );
       }
+      await syncRackAndLevelRentalStatus(client, { rackIds: [], levelIds: uniqueLevelIds });
     } else {
       await client.query('ROLLBACK');
       return res.status(400).json({ message: 'rentalType của request không hợp lệ' });
@@ -443,6 +500,10 @@ export async function updateContract(req, res) {
     if (!contract) {
       return res.status(404).json({ message: 'Contract không tồn tại' });
     }
+    if (updates.status !== undefined) {
+      const { rackIds, levelIds } = await getContractItemTargetIds(pool, id);
+      await syncRackAndLevelRentalStatus(pool, { rackIds, levelIds });
+    }
     return res.json(contract);
   } catch (error) {
     console.error('Error updating contract:', error);
@@ -454,6 +515,7 @@ export async function updateContract(req, res) {
 export async function deleteContract(req, res) {
   try {
     const { id } = req.params;
+    const { rackIds, levelIds } = await getContractItemTargetIds(pool, id);
     const query = `
       UPDATE ${CONTRACT_TABLE}
       SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
@@ -465,6 +527,7 @@ export async function deleteContract(req, res) {
     if (!contract) {
       return res.status(404).json({ message: 'Contract không tồn tại' });
     }
+    await syncRackAndLevelRentalStatus(pool, { rackIds, levelIds });
 
     return res.json({
       message: 'Contract đã được hủy',

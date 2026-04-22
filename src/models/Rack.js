@@ -48,6 +48,11 @@ export const rackSchema = {
     min: 0,
     note: 'Sức chứa tối đa tính bằng kg',
   },
+  isRented: {
+    type: 'boolean',
+    default: false,
+    note: 'Rack đang được thuê hay chưa',
+  },
   createdAt: {
     type: 'datetime',
     default: 'NOW()',
