@@ -215,7 +215,11 @@ Swagger UI: cùng host + `/api-docs`
 
 ### `POST /api/warehouses`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
-- **Request body** — `warehouseCode`, `warehouseName`, `warehouseType`, `address`, `length`, `width`, `height` bắt buộc; `branchId` (hoặc suy từ `managerId` / user đăng nhập), `managerId`, `warehouseSize`, `city`, `district`, `operatingHours`, `usableArea`, nhiệt độ kho lạnh… tùy chọn. **`warehouseId` do server sinh (`WH0001`…), không gửi trong body.**
+- **Request body** — `warehouseCode`, `warehouseName`, `address`, `length`, `width`, `height` bắt buộc; `branchId` (hoặc suy từ `managerId` / user đăng nhập), `managerId`, `district`, `operatingHours`, `totalArea`, `usableArea`, nhiệt độ kho lạnh… tùy chọn. **`warehouseId` do server sinh (`WH0001`…), không gửi trong body.**
+- **Validation chính**
+  - `length`, `width`, `height` phải `> 0`
+  - `totalArea` (nếu gửi) phải đúng bằng `length * width` (server vẫn tự tính theo `length * width`)
+  - `usableArea` (nếu gửi) phải `>= 0` và `<= totalArea`
 
 ```json
 {
@@ -223,15 +227,13 @@ Swagger UI: cùng host + `/api-docs`
   "managerId": "USR0001",
   "warehouseCode": "WH-HCM-01",
   "warehouseName": "Kho Thu Duc",
-  "warehouseType": "normal_storage",
-  "warehouseSize": "large",
   "address": "123 Xa Lo Ha Noi",
-  "city": "HCM",
   "district": "Thu Duc",
   "operatingHours": "08:00-17:30",
   "length": 120,
   "width": 80,
   "height": 12,
+  "totalArea": 9600,
   "usableArea": 9000
 }
 ```
@@ -240,7 +242,7 @@ Swagger UI: cùng host + `/api-docs`
   - `WarehouseResponse`
 
 ### `GET /api/warehouses`
-- **Query** — optional: `page` (default 1), `limit` (default 10), `city`, `warehouseType`, `search`; ví dụ `?page=1&limit=10&city=HCM&warehouseType=normal_storage`
+- **Query** — optional: `page` (default 1), `limit` (default 10), `search`, `vacant`; ví dụ `?page=1&limit=10&search=Thu%20Duc&vacant=true`
 - **Response `200`**
   - `warehouses: array<WarehouseResponse>`
   - `pagination: PaginationResponse`
@@ -253,7 +255,9 @@ Swagger UI: cùng host + `/api-docs`
 ### `PATCH /api/warehouses/{id}`
 - **Auth** — `Bearer token`, role: `admin` hoặc `warehouse_staff`
 - **Path** — `id`
-- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `warehouseId`, `createdAt`, `updatedAt`
+- **Request body** — ít nhất 1 field hợp lệ; không cho cập nhật `warehouseId`, `createdAt`, `updatedAt`.
+  - Không cho cập nhật trực tiếp `occupiedPercent`, `occupancyStatus` (2 field này được hệ thống tự đồng bộ từ tình trạng thuê rack/level)
+  - Quy tắc validation `length/width/height/totalArea/usableArea` giống `POST /api/warehouses`
 
 ```json
 {
@@ -866,10 +870,7 @@ Swagger UI: cùng host + `/api-docs`
   "managerId": "string | null",
   "warehouseCode": "string",
   "warehouseName": "string",
-  "warehouseType": "string | null",
-  "warehouseSize": "small | medium | large | extra_large | null",
   "address": "string | null",
-  "city": "string | null",
   "district": "string | null",
   "operatingHours": "string | null",
   "length": "number | null",
@@ -877,6 +878,8 @@ Swagger UI: cùng host + `/api-docs`
   "height": "number | null",
   "totalArea": "number | null",
   "usableArea": "number | null",
+  "occupiedPercent": "number (0..100)",
+  "occupancyStatus": "EMPTY | PARTIAL | FULL",
   "isActive": "boolean",
   "createdAt": "datetime",
   "updatedAt": "datetime"
