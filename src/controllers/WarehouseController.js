@@ -50,6 +50,16 @@ function mapZoneRow(row) {
   };
 }
 
+function mapZoneWithSlots(row) {
+  if (!row) return null;
+  return {
+    ...mapZoneRow(row),
+    totalSlots: row.total_slots !== undefined && row.total_slots !== null
+      ? parseInt(row.total_slots, 10)
+      : 0,
+  };
+}
+
 const CREATE_REQUIRED_FIELDS = [
   "warehouseCode",
   "warehouseName",
