@@ -1,14 +1,14 @@
-import pool from '../config/db.js';
-import { tableName as WAREHOUSE_TABLE } from '../models/Warehouse.js';
-import { tableName as USER_TABLE } from '../models/User.js';
-import { tableName as BRANCH_TABLE } from '../models/Branch.js';
-import { tableName as CONTRACT_TABLE } from '../models/Contract.js';
-import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
-import { tableName as ZONE_TABLE } from '../models/Zone.js';
-import { tableName as SLOT_TABLE } from '../models/Slot.js';
-import { tableName as LEVEL_TABLE } from '../models/Level.js';
-import { tableName as RACK_TABLE } from '../models/Rack.js';
-import { generatePrefixedId } from '../utils/idGenerator.js';
+import pool from "../config/db.js";
+import { tableName as WAREHOUSE_TABLE } from "../models/Warehouse.js";
+import { tableName as USER_TABLE } from "../models/User.js";
+import { tableName as BRANCH_TABLE } from "../models/Branch.js";
+import { tableName as CONTRACT_TABLE } from "../models/Contract.js";
+import { tableName as CONTRACT_ITEM_TABLE } from "../models/ContractItem.js";
+import { tableName as ZONE_TABLE } from "../models/Zone.js";
+import { tableName as SLOT_TABLE } from "../models/Slot.js";
+import { tableName as LEVEL_TABLE } from "../models/Level.js";
+import { tableName as RACK_TABLE } from "../models/Rack.js";
+import { generatePrefixedId } from "../utils/idGenerator.js";
 
 // Map DB row -> domain object
 function mapWarehouseRow(row) {
@@ -33,13 +33,30 @@ function mapWarehouseRow(row) {
   };
 }
 
+function mapZoneRow(row) {
+  if (!row) return null;
+  return {
+    zoneId: row.zone_id,
+    warehouseId: row.warehouse_id,
+    zoneCode: row.zone_code,
+    zoneName: row.zone_name,
+    length: row.length,
+    width: row.width,
+    totalArea: row.total_area,
+    isRented: row.is_rented,
+    warehouseName: row.warehouse_name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 const CREATE_REQUIRED_FIELDS = [
-  'warehouseCode',
-  'warehouseName',
-  'address',
-  'length',
-  'width',
-  'height',
+  "warehouseCode",
+  "warehouseName",
+  "address",
+  "length",
+  "width",
+  "height",
 ];
 
 function parsePositiveNumber(value, fieldName) {
@@ -51,7 +68,7 @@ function parsePositiveNumber(value, fieldName) {
 }
 
 function parseOptionalNonNegativeNumber(value, fieldName) {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null || value === "") {
     return { value: null };
   }
   const parsed = Number(value);
@@ -82,7 +99,9 @@ async function resolveBranchId({ branchId, managerId, currentUserId }) {
       WHERE user_id = $1
       LIMIT 1;
     `;
-    const { rows: currentUserRows } = await pool.query(currentUserQuery, [currentUserId]);
+    const { rows: currentUserRows } = await pool.query(currentUserQuery, [
+      currentUserId,
+    ]);
     if (currentUserRows[0]?.branch_id) return currentUserRows[0].branch_id;
   }
 
@@ -108,8 +127,8 @@ export async function createWarehouse(req, res) {
     } = req.body;
     const warehouseId = await generatePrefixedId(pool, {
       tableName: WAREHOUSE_TABLE,
-      idColumn: 'warehouse_id',
-      prefix: 'WH',
+      idColumn: "warehouse_id",
+      prefix: "WH",
     });
     const branchId = await resolveBranchId({
       branchId: incomingBranchId,
@@ -128,64 +147,84 @@ export async function createWarehouse(req, res) {
     };
     if (!branchId) {
       return res.status(400).json({
-        message: 'Không xác định được branchId. Hãy truyền branchId hoặc dùng manager/user có branchId hợp lệ',
+        message:
+          "Không xác định được branchId. Hãy truyền branchId hoặc dùng manager/user có branchId hợp lệ",
       });
     }
-    const missing = CREATE_REQUIRED_FIELDS.filter((field) => requiredPayload[field] === undefined || requiredPayload[field] === null || requiredPayload[field] === '');
+    const missing = CREATE_REQUIRED_FIELDS.filter(
+      (field) =>
+        requiredPayload[field] === undefined ||
+        requiredPayload[field] === null ||
+        requiredPayload[field] === "",
+    );
     if (missing.length > 0) {
       return res.status(400).json({
-        message: `Thiếu các field bắt buộc: ${missing.join(', ')}`,
+        message: `Thiếu các field bắt buộc: ${missing.join(", ")}`,
       });
     }
 
     const branchCheck = await pool.query(
       `SELECT 1 FROM ${BRANCH_TABLE} WHERE branch_id = $1 LIMIT 1;`,
-      [branchId]
+      [branchId],
     );
     if (branchCheck.rows.length === 0) {
-      return res.status(400).json({ message: 'branchId không tồn tại trong hệ thống' });
+      return res
+        .status(400)
+        .json({ message: "branchId không tồn tại trong hệ thống" });
     }
 
     if (managerId) {
       const managerCheck = await pool.query(
         `SELECT 1 FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1;`,
-        [managerId]
+        [managerId],
       );
       if (managerCheck.rows.length === 0) {
-        return res.status(400).json({ message: 'managerId không tồn tại trong hệ thống' });
+        return res
+          .status(400)
+          .json({ message: "managerId không tồn tại trong hệ thống" });
       }
     }
 
-    const parsedLength = parsePositiveNumber(length, 'length');
+    const parsedLength = parsePositiveNumber(length, "length");
     if (parsedLength.error) {
       return res.status(400).json({ message: parsedLength.error });
     }
-    const parsedWidth = parsePositiveNumber(width, 'width');
+    const parsedWidth = parsePositiveNumber(width, "width");
     if (parsedWidth.error) {
       return res.status(400).json({ message: parsedWidth.error });
     }
-    const parsedHeight = parsePositiveNumber(height, 'height');
+    const parsedHeight = parsePositiveNumber(height, "height");
     if (parsedHeight.error) {
       return res.status(400).json({ message: parsedHeight.error });
     }
 
     const computedTotalArea = parsedLength.value * parsedWidth.value;
-    if (totalArea !== undefined && totalArea !== null && totalArea !== '') {
-      const parsedTotalArea = parsePositiveNumber(totalArea, 'totalArea');
+    if (totalArea !== undefined && totalArea !== null && totalArea !== "") {
+      const parsedTotalArea = parsePositiveNumber(totalArea, "totalArea");
       if (parsedTotalArea.error) {
         return res.status(400).json({ message: parsedTotalArea.error });
       }
       if (Math.abs(parsedTotalArea.value - computedTotalArea) > 0.0001) {
-        return res.status(400).json({ message: 'totalArea phải bằng length * width' });
+        return res
+          .status(400)
+          .json({ message: "totalArea phải bằng length * width" });
       }
     }
 
-    const parsedUsableArea = parseOptionalNonNegativeNumber(usableArea, 'usableArea');
+    const parsedUsableArea = parseOptionalNonNegativeNumber(
+      usableArea,
+      "usableArea",
+    );
     if (parsedUsableArea.error) {
       return res.status(400).json({ message: parsedUsableArea.error });
     }
-    if (parsedUsableArea.value !== null && parsedUsableArea.value > computedTotalArea) {
-      return res.status(400).json({ message: 'usableArea không được lớn hơn totalArea' });
+    if (
+      parsedUsableArea.value !== null &&
+      parsedUsableArea.value > computedTotalArea
+    ) {
+      return res
+        .status(400)
+        .json({ message: "usableArea không được lớn hơn totalArea" });
     }
 
     const conflictQuery = `
@@ -194,13 +233,20 @@ export async function createWarehouse(req, res) {
       WHERE warehouse_id = $1 OR warehouse_code = $2
       LIMIT 1;
     `;
-    const { rows: conflictRows } = await pool.query(conflictQuery, [warehouseId, warehouseCode]);
+    const { rows: conflictRows } = await pool.query(conflictQuery, [
+      warehouseId,
+      warehouseCode,
+    ]);
     if (conflictRows.length > 0) {
       const existing = conflictRows[0];
       if (existing.warehouse_id === warehouseId) {
-        return res.status(409).json({ message: 'warehouseId đã tồn tại, vui lòng thử lại' });
+        return res
+          .status(409)
+          .json({ message: "warehouseId đã tồn tại, vui lòng thử lại" });
       }
-      return res.status(409).json({ message: `warehouseCode "${warehouseCode}" đã tồn tại` });
+      return res
+        .status(409)
+        .json({ message: `warehouseCode "${warehouseCode}" đã tồn tại` });
     }
 
     const query = `
@@ -241,21 +287,28 @@ export async function createWarehouse(req, res) {
     const { rows } = await pool.query(query, values);
     return res.status(201).json(mapWarehouseRow(rows[0]));
   } catch (error) {
-    console.error('Error creating warehouse:', error);
-    if (error.code === '23503') {
-      return res.status(400).json({ message: 'Không thể tạo warehouse: branchId hoặc managerId không tồn tại' });
+    console.error("Error creating warehouse:", error);
+    if (error.code === "23503") {
+      return res.status(400).json({
+        message:
+          "Không thể tạo warehouse: branchId hoặc managerId không tồn tại",
+      });
     }
-    if (error.code === '23505') {
-      const detail = String(error.detail || '');
-      if (detail.includes('warehouse_code')) {
-        return res.status(409).json({ message: 'warehouseCode đã tồn tại' });
+    if (error.code === "23505") {
+      const detail = String(error.detail || "");
+      if (detail.includes("warehouse_code")) {
+        return res.status(409).json({ message: "warehouseCode đã tồn tại" });
       }
-      if (detail.includes('warehouse_id')) {
-        return res.status(409).json({ message: 'warehouseId đã tồn tại, vui lòng thử lại' });
+      if (detail.includes("warehouse_id")) {
+        return res
+          .status(409)
+          .json({ message: "warehouseId đã tồn tại, vui lòng thử lại" });
       }
-      return res.status(409).json({ message: 'Dữ liệu trùng lặp (ràng buộc unique trên database)' });
+      return res.status(409).json({
+        message: "Dữ liệu trùng lặp (ràng buộc unique trên database)",
+      });
     }
-    return res.status(500).json({ message: 'Lỗi server' });
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
 
@@ -266,11 +319,11 @@ export async function listWarehouses(req, res) {
     const { page = 1, limit = 10, search, vacant } = req.query;
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE w.is_active = true';
+    let whereClause = "WHERE w.is_active = true";
     const filterValues = [];
     let filterParamIndex = 1;
 
-    if (vacant === 'true' || vacant === true) {
+    if (vacant === "true" || vacant === true) {
       whereClause += `
         AND NOT EXISTS (
           SELECT 1
@@ -330,8 +383,8 @@ export async function listWarehouses(req, res) {
       },
     });
   } catch (error) {
-    console.error('Error listing warehouses:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
+    console.error("Error listing warehouses:", error);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
 
@@ -348,7 +401,7 @@ export async function updateWarehouse(req, res) {
     const checkQuery = `SELECT * FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1;`;
     const { rows: existingRows } = await pool.query(checkQuery, [id]);
     if (existingRows.length === 0) {
-      return res.status(404).json({ message: 'Warehouse không tồn tại' });
+      return res.status(404).json({ message: "Warehouse không tồn tại" });
     }
     const existing = existingRows[0];
 
@@ -359,26 +412,29 @@ export async function updateWarehouse(req, res) {
         WHERE warehouse_code = $1 AND warehouse_id <> $2
         LIMIT 1;
       `;
-      const { rows: conflictRows } = await pool.query(conflictQuery, [updates.warehouseCode, id]);
+      const { rows: conflictRows } = await pool.query(conflictQuery, [
+        updates.warehouseCode,
+        id,
+      ]);
       if (conflictRows.length > 0) {
-        return res.status(409).json({ message: 'warehouseCode đã tồn tại' });
+        return res.status(409).json({ message: "warehouseCode đã tồn tại" });
       }
     }
 
     const allowed = [
-      'branchId',
-      'managerId',
-      'warehouseCode',
-      'warehouseName',
-      'address',
-      'district',
-      'operatingHours',
-      'length',
-      'width',
-      'height',
-      'totalArea',
-      'usableArea',
-      'isActive',
+      "branchId",
+      "managerId",
+      "warehouseCode",
+      "warehouseName",
+      "address",
+      "district",
+      "operatingHours",
+      "length",
+      "width",
+      "height",
+      "totalArea",
+      "usableArea",
+      "isActive",
     ];
 
     const fields = [];
@@ -387,7 +443,10 @@ export async function updateWarehouse(req, res) {
 
     for (const key of Object.keys(updates)) {
       if (!allowed.includes(key)) continue;
-      if (['length', 'width', 'height', 'totalArea', 'usableArea'].includes(key)) continue;
+      if (
+        ["length", "width", "height", "totalArea", "usableArea"].includes(key)
+      )
+        continue;
       const dbField = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
       fields.push(`${dbField} = $${paramIndex}`);
       values.push(updates[key]);
@@ -395,22 +454,31 @@ export async function updateWarehouse(req, res) {
     }
 
     if (fields.length === 0) {
-      return res.status(400).json({ message: 'Không có field nào để cập nhật' });
+      return res
+        .status(400)
+        .json({ message: "Không có field nào để cập nhật" });
     }
 
-    const hasLength = Object.prototype.hasOwnProperty.call(updates, 'length');
-    const hasWidth = Object.prototype.hasOwnProperty.call(updates, 'width');
-    const hasHeight = Object.prototype.hasOwnProperty.call(updates, 'height');
-    const hasTotalArea = Object.prototype.hasOwnProperty.call(updates, 'totalArea');
-    const hasUsableArea = Object.prototype.hasOwnProperty.call(updates, 'usableArea');
+    const hasLength = Object.prototype.hasOwnProperty.call(updates, "length");
+    const hasWidth = Object.prototype.hasOwnProperty.call(updates, "width");
+    const hasHeight = Object.prototype.hasOwnProperty.call(updates, "height");
+    const hasTotalArea = Object.prototype.hasOwnProperty.call(
+      updates,
+      "totalArea",
+    );
+    const hasUsableArea = Object.prototype.hasOwnProperty.call(
+      updates,
+      "usableArea",
+    );
 
     let nextLength = Number(existing.length);
     let nextWidth = Number(existing.width);
     let nextTotalArea = Number(existing.total_area);
 
     if (hasLength) {
-      const parsedLength = parsePositiveNumber(updates.length, 'length');
-      if (parsedLength.error) return res.status(400).json({ message: parsedLength.error });
+      const parsedLength = parsePositiveNumber(updates.length, "length");
+      if (parsedLength.error)
+        return res.status(400).json({ message: parsedLength.error });
       nextLength = parsedLength.value;
       fields.push(`length = $${paramIndex}`);
       values.push(parsedLength.value);
@@ -418,8 +486,9 @@ export async function updateWarehouse(req, res) {
     }
 
     if (hasWidth) {
-      const parsedWidth = parsePositiveNumber(updates.width, 'width');
-      if (parsedWidth.error) return res.status(400).json({ message: parsedWidth.error });
+      const parsedWidth = parsePositiveNumber(updates.width, "width");
+      if (parsedWidth.error)
+        return res.status(400).json({ message: parsedWidth.error });
       nextWidth = parsedWidth.value;
       fields.push(`width = $${paramIndex}`);
       values.push(parsedWidth.value);
@@ -427,8 +496,9 @@ export async function updateWarehouse(req, res) {
     }
 
     if (hasHeight) {
-      const parsedHeight = parsePositiveNumber(updates.height, 'height');
-      if (parsedHeight.error) return res.status(400).json({ message: parsedHeight.error });
+      const parsedHeight = parsePositiveNumber(updates.height, "height");
+      if (parsedHeight.error)
+        return res.status(400).json({ message: parsedHeight.error });
       fields.push(`height = $${paramIndex}`);
       values.push(parsedHeight.value);
       paramIndex++;
@@ -439,10 +509,16 @@ export async function updateWarehouse(req, res) {
     }
 
     if (hasTotalArea) {
-      const parsedTotalArea = parsePositiveNumber(updates.totalArea, 'totalArea');
-      if (parsedTotalArea.error) return res.status(400).json({ message: parsedTotalArea.error });
-      if (Math.abs(parsedTotalArea.value - (nextLength * nextWidth)) > 0.0001) {
-        return res.status(400).json({ message: 'totalArea phải bằng length * width' });
+      const parsedTotalArea = parsePositiveNumber(
+        updates.totalArea,
+        "totalArea",
+      );
+      if (parsedTotalArea.error)
+        return res.status(400).json({ message: parsedTotalArea.error });
+      if (Math.abs(parsedTotalArea.value - nextLength * nextWidth) > 0.0001) {
+        return res
+          .status(400)
+          .json({ message: "totalArea phải bằng length * width" });
       }
     }
 
@@ -453,10 +529,19 @@ export async function updateWarehouse(req, res) {
     }
 
     if (hasUsableArea) {
-      const parsedUsableArea = parseOptionalNonNegativeNumber(updates.usableArea, 'usableArea');
-      if (parsedUsableArea.error) return res.status(400).json({ message: parsedUsableArea.error });
-      if (parsedUsableArea.value !== null && parsedUsableArea.value > nextTotalArea) {
-        return res.status(400).json({ message: 'usableArea không được lớn hơn totalArea' });
+      const parsedUsableArea = parseOptionalNonNegativeNumber(
+        updates.usableArea,
+        "usableArea",
+      );
+      if (parsedUsableArea.error)
+        return res.status(400).json({ message: parsedUsableArea.error });
+      if (
+        parsedUsableArea.value !== null &&
+        parsedUsableArea.value > nextTotalArea
+      ) {
+        return res
+          .status(400)
+          .json({ message: "usableArea không được lớn hơn totalArea" });
       }
       fields.push(`usable_area = $${paramIndex}`);
       values.push(parsedUsableArea.value);
@@ -466,15 +551,15 @@ export async function updateWarehouse(req, res) {
     values.push(id);
     const query = `
       UPDATE ${WAREHOUSE_TABLE}
-      SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP
       WHERE warehouse_id = $${paramIndex}
       RETURNING *;
     `;
     const { rows } = await pool.query(query, values);
     return res.json(mapWarehouseRow(rows[0]));
   } catch (error) {
-    console.error('Error updating warehouse:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
+    console.error("Error updating warehouse:", error);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
 
@@ -491,13 +576,13 @@ export async function deleteWarehouse(req, res) {
     `;
     const { rows } = await pool.query(query, [id]);
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Warehouse không tồn tại' });
+      return res.status(404).json({ message: "Warehouse không tồn tại" });
     }
 
-    return res.json({ message: 'Đã xóa warehouse' });
+    return res.json({ message: "Đã xóa warehouse" });
   } catch (error) {
-    console.error('Error deleting warehouse:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
+    console.error("Error deleting warehouse:", error);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
 
@@ -516,13 +601,15 @@ export async function getWarehouseById(req, res) {
 
     const { rows } = await pool.query(query, [id]);
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Warehouse không tồn tại hoặc không hoạt động' });
+      return res
+        .status(404)
+        .json({ message: "Warehouse không tồn tại hoặc không hoạt động" });
     }
 
     return res.json(mapWarehouseRow(rows[0]));
   } catch (error) {
-    console.error('Error getting warehouse:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
+    console.error("Error getting warehouse:", error);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
 
@@ -535,7 +622,7 @@ export async function getWarehouseZones(req, res) {
     const warehouseQuery = `SELECT 1 FROM ${WAREHOUSE_TABLE} WHERE warehouse_id = $1 AND is_active = true;`;
     const { rows: warehouseRows } = await pool.query(warehouseQuery, [id]);
     if (warehouseRows.length === 0) {
-      return res.status(404).json({ message: 'Warehouse không tồn tại' });
+      return res.status(404).json({ message: "Warehouse không tồn tại" });
     }
 
     const query = `
@@ -550,9 +637,10 @@ export async function getWarehouseZones(req, res) {
     `;
 
     const { rows } = await pool.query(query, [id]);
-    return res.json({ zones: rows });
+    const zones = rows.map(mapZoneWithSlots);
+    return res.json({ zones });
   } catch (error) {
-    console.error('Error getting warehouse zones:', error);
-    return res.status(500).json({ message: 'Lỗi server' });
+    console.error("Error getting warehouse zones:", error);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 }
