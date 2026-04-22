@@ -96,6 +96,15 @@ router.get('/', listWarehouses);
  *                 type: number
  *                 minimum: 0
  *                 description: Nếu truyền thì phải >= 0 và không vượt totalArea
+ *               occupiedPercent:
+ *                 type: number
+ *                 readOnly: true
+ *                 description: Tự tính bởi hệ thống theo tỷ lệ rack/level đã thuê
+ *               occupancyStatus:
+ *                 type: string
+ *                 enum: [EMPTY, PARTIAL, FULL]
+ *                 readOnly: true
+ *                 description: Tự tính bởi hệ thống theo occupiedPercent
  *               temperatureMin:
  *                 type: number
  *               temperatureMax:
@@ -179,6 +188,13 @@ router.get('/:id', getWarehouseById);
  *               usableArea:
  *                 type: number
  *                 minimum: 0
+ *               occupiedPercent:
+ *                 type: number
+ *                 readOnly: true
+ *               occupancyStatus:
+ *                 type: string
+ *                 enum: [EMPTY, PARTIAL, FULL]
+ *                 readOnly: true
  *               isActive:
  *                 type: boolean
  *     responses:

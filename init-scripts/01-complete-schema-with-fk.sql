@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS warehouses (
     height DECIMAL(10, 2) NOT NULL,
     total_area DECIMAL(10, 2),
     usable_area DECIMAL(10, 2),
+    occupied_percent DECIMAL(5, 2) DEFAULT 0,
+    occupancy_status VARCHAR(20) DEFAULT 'EMPTY' CHECK (occupancy_status IN ('EMPTY', 'PARTIAL', 'FULL')),
     temperature_min DECIMAL(5, 2),
     temperature_max DECIMAL(5, 2),
     is_active BOOLEAN DEFAULT TRUE,

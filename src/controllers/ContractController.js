@@ -6,6 +6,7 @@ import { tableName as CONTRACT_ITEM_TABLE } from '../models/ContractItem.js';
 import { tableName as RACK_TABLE } from '../models/Rack.js';
 import { tableName as LEVEL_TABLE } from '../models/Level.js';
 import { tableName as ZONE_TABLE } from '../models/Zone.js';
+import { tableName as WAREHOUSE_TABLE } from '../models/Warehouse.js';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as NOTIFICATION_TABLE } from '../models/Notification.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
@@ -119,6 +120,80 @@ async function syncRackAndLevelRentalStatus(client, { rackIds = [], levelIds = [
       WHERE l.level_id IN (${levelPlaceholders})
       `,
       levelIds,
+    );
+  }
+
+  const warehouseIdSet = new Set();
+  if (rackIds.length > 0) {
+    const placeholders = rackIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    const { rows } = await client.query(
+      `
+      SELECT DISTINCT z.warehouse_id
+      FROM ${RACK_TABLE} r
+      JOIN ${ZONE_TABLE} z ON z.zone_id = r.zone_id
+      WHERE r.rack_id IN (${placeholders})
+      `,
+      rackIds,
+    );
+    rows.forEach((r) => warehouseIdSet.add(r.warehouse_id));
+  }
+  if (levelIds.length > 0) {
+    const placeholders = levelIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    const { rows } = await client.query(
+      `
+      SELECT DISTINCT z.warehouse_id
+      FROM ${LEVEL_TABLE} l
+      JOIN ${RACK_TABLE} r ON r.rack_id = l.rack_id
+      JOIN ${ZONE_TABLE} z ON z.zone_id = r.zone_id
+      WHERE l.level_id IN (${placeholders})
+      `,
+      levelIds,
+    );
+    rows.forEach((r) => warehouseIdSet.add(r.warehouse_id));
+  }
+
+  const warehouseIds = Array.from(warehouseIdSet);
+  if (warehouseIds.length > 0) {
+    const placeholders = warehouseIds.map((_, idx) => `$${idx + 1}`).join(', ');
+    await client.query(
+      `
+      WITH warehouse_stats AS (
+        SELECT
+          w.warehouse_id,
+          COUNT(DISTINCT r.rack_id) AS rack_count,
+          COUNT(DISTINCT CASE WHEN r.is_rented THEN r.rack_id END) AS rented_rack_count,
+          COUNT(DISTINCT l.level_id) AS level_count,
+          COUNT(DISTINCT CASE WHEN l.is_rented THEN l.level_id END) AS rented_level_count
+        FROM ${WAREHOUSE_TABLE} w
+        LEFT JOIN ${ZONE_TABLE} z ON z.warehouse_id = w.warehouse_id
+        LEFT JOIN ${RACK_TABLE} r ON r.zone_id = z.zone_id
+        LEFT JOIN ${LEVEL_TABLE} l ON l.rack_id = r.rack_id
+        WHERE w.warehouse_id IN (${placeholders})
+        GROUP BY w.warehouse_id
+      ),
+      normalized AS (
+        SELECT
+          warehouse_id,
+          CASE WHEN level_count > 0 THEN level_count ELSE rack_count END AS total_units,
+          CASE WHEN level_count > 0 THEN rented_level_count ELSE rented_rack_count END AS rented_units
+        FROM warehouse_stats
+      )
+      UPDATE ${WAREHOUSE_TABLE} w
+      SET
+        occupied_percent = CASE
+          WHEN n.total_units <= 0 THEN 0
+          ELSE ROUND((n.rented_units::numeric * 100.0) / n.total_units::numeric, 2)
+        END,
+        occupancy_status = CASE
+          WHEN n.rented_units <= 0 THEN 'EMPTY'
+          WHEN n.total_units > 0 AND n.rented_units >= n.total_units THEN 'FULL'
+          ELSE 'PARTIAL'
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      FROM normalized n
+      WHERE w.warehouse_id = n.warehouse_id
+      `,
+      warehouseIds,
     );
   }
 }
@@ -579,6 +654,9 @@ export async function sendContractToTenant(req, res) {
       });
     }
 
+    const { rackIds, levelIds } = await getContractItemTargetIds(client, id);
+    await syncRackAndLevelRentalStatus(client, { rackIds, levelIds });
+
     await client.query('COMMIT');
     return res.json(mapContractRow(contract));
   } catch (error) {
@@ -628,6 +706,9 @@ export async function signContractByTenant(req, res) {
         message: 'Contract không tồn tại/không thuộc tenant của bạn hoặc chưa ở trạng thái SENT_TO_TENANT',
       });
     }
+
+    const { rackIds, levelIds } = await getContractItemTargetIds(client, id);
+    await syncRackAndLevelRentalStatus(client, { rackIds, levelIds });
 
     if (contract.approved_by) {
       await createNotification(client, contract.approved_by, {
