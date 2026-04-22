@@ -35,7 +35,6 @@ const router = express.Router();
  *               - email
  *               - password
  *               - fullName
- *               - tenantId
  *               - role
  *             properties:
  *               email:
@@ -51,10 +50,6 @@ const router = express.Router();
  *               fullName:
  *                 type: string
  *                 example: Nguyễn Văn A
- *               tenantId:
- *                 type: string
- *                 description: Mã tenant (FK `tenants.tenant_id`) mà user thuộc về
- *                 example: TEN001
  *               role:
  *                 type: string
  *                 enum: [admin, warehouse_staff, transport_staff]
@@ -65,27 +60,15 @@ const router = express.Router();
  *               username:
  *                 type: string
  *                 description: Đăng nhập; nếu bỏ qua thì mặc định bằng `email`
- *                 example: admin_kh
- *               branchId:
- *                 type: string
- *                 nullable: true
- *                 description: Chi nhánh gắn tùy chọn (FK `branches.branch_id`)
+ *                 example: staff_kho
  *               phone:
  *                 type: string
  *                 nullable: true
- *               isActive:
- *                 type: boolean
- *                 default: true
- *                 description: Tài khoản kích hoạt ngay (mặc định true)
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *                 description: Nếu gửi thì ưu tiên hơn `isActive` (active = true, inactive = false)
  *     responses:
  *       201:
  *         description: Đã tạo user nội bộ (response không chứa password/passwordHash)
  *       400:
- *         description: Thiếu field bắt buộc, role không hợp lệ, tenant/branch không tồn tại
+ *         description: Thiếu field bắt buộc hoặc role không hợp lệ
  *       401:
  *         description: Chưa đăng nhập
  *       403:

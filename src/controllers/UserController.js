@@ -38,18 +38,13 @@ export async function createUser(req, res) {
       email,
       password,
       fullName,
-      tenantId,
       role,
       username: usernameBody,
-      branchId = null,
       phone = null,
-      isActive = true,
-      status,
     } = req.body;
 
     const emailTrim = typeof email === 'string' ? email.trim() : '';
     const fullNameTrim = typeof fullName === 'string' ? fullName.trim() : '';
-    const tenantIdTrim = typeof tenantId === 'string' ? tenantId.trim() : '';
     const passwordStr = typeof password === 'string' ? password : '';
     const roleTrim = typeof role === 'string' ? role.trim() : '';
     const usernameTrim =
@@ -57,9 +52,9 @@ export async function createUser(req, res) {
         ? usernameBody.trim()
         : emailTrim;
 
-    if (!emailTrim || !passwordStr || !fullNameTrim || !tenantIdTrim || !roleTrim) {
+    if (!emailTrim || !passwordStr || !fullNameTrim || !roleTrim) {
       return res.status(400).json({
-        message: 'Thiếu thông tin: email, password, fullName, tenantId và role là bắt buộc',
+        message: 'Thiếu thông tin: email, password, fullName và role là bắt buộc',
       });
     }
 
@@ -71,33 +66,15 @@ export async function createUser(req, res) {
 
     const passwordHash = await bcrypt.hash(passwordStr, BCRYPT_SALT_ROUNDS);
 
-    const { rows: tenantRows } = await pool.query(
-      `SELECT 1 FROM tenants WHERE tenant_id = $1 LIMIT 1`,
-      [tenantIdTrim],
-    );
-    if (tenantRows.length === 0) {
-      return res.status(400).json({ message: 'Không tồn tại tenant với tenantId đã gửi' });
-    }
-
-    if (branchId) {
-      const { rows: br } = await pool.query(
-        `SELECT 1 FROM branches WHERE branch_id = $1 LIMIT 1`,
-        [branchId],
-      );
-      if (br.length === 0) {
-        return res.status(400).json({ message: 'Không tồn tại chi nhánh với branchId đã gửi' });
-      }
-    }
-
-    const active =
-      status !== undefined ? status === 'active' : Boolean(isActive);
-
     const userId = await generatePrefixedId(pool, {
       tableName: USER_TABLE,
       idColumn: 'user_id',
       prefix: 'USR',
     });
 
+    // Staff nội bộ (admin/warehouse_staff/transport_staff) không thuộc tenant/branch
+    // cụ thể nên tenant_id và branch_id để NULL. is_active mặc định TRUE vì mọi
+    // tài khoản tạo mới phải luôn hoạt động được (không còn flow kích hoạt thủ công).
     const query = `
       INSERT INTO ${USER_TABLE} (
         user_id,
@@ -111,21 +88,18 @@ export async function createUser(req, res) {
         role,
         is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, NULL, NULL, $2, $3, $4, $5, $6, $7, TRUE)
       RETURNING *;
     `;
 
     const values = [
       userId,
-      tenantIdTrim,
-      branchId || null,
       usernameTrim,
       emailTrim,
       passwordHash,
       fullNameTrim,
       phone || null,
       roleTrim,
-      active,
     ];
 
     const { rows } = await pool.query(query, values);
@@ -135,9 +109,6 @@ export async function createUser(req, res) {
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ message: 'Email hoặc username đã tồn tại' });
-    }
-    if (err.code === '23503') {
-      return res.status(400).json({ message: 'Dữ liệu tham chiếu không hợp lệ (tenant/branch)' });
     }
     console.error('Error creating user:', err);
     return res.status(500).json({ message: 'Internal server error' });
