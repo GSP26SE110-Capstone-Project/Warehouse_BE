@@ -29,6 +29,10 @@ const router = express.Router();
  *         name: rackId
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: isRented
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
  *         description: Level list

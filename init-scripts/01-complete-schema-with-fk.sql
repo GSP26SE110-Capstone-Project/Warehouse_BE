@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS racks (
     width DECIMAL(10, 2) NOT NULL,
     height DECIMAL(10, 2) NOT NULL,
     max_weight_capacity DECIMAL(10, 2),
+    is_rented BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (zone_id) REFERENCES zones(zone_id) ON DELETE CASCADE
@@ -129,6 +130,7 @@ CREATE TABLE IF NOT EXISTS levels (
     level_number INTEGER NOT NULL,
     height_clearance DECIMAL(10, 2),
     max_weight DECIMAL(10, 2),
+    is_rented BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (rack_id) REFERENCES racks(rack_id) ON DELETE CASCADE,
     UNIQUE(rack_id, level_number)

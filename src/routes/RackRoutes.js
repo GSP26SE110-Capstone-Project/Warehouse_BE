@@ -38,6 +38,10 @@ const router = express.Router();
  *         name: search
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: isRented
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
  *         description: Rack list

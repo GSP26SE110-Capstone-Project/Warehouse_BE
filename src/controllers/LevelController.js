@@ -11,6 +11,7 @@ function mapLevelRow(row) {
     levelNumber: row.level_number,
     heightClearance: row.height_clearance,
     maxWeight: row.max_weight,
+    isRented: row.is_rented,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -126,7 +127,7 @@ export async function createLevel(req, res) {
 // GET /levels
 export async function listLevels(req, res) {
   try {
-    const { page = 1, limit = 10, rackId } = req.query;
+    const { page = 1, limit = 10, rackId, isRented } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE 1=1';
@@ -136,6 +137,11 @@ export async function listLevels(req, res) {
     if (rackId) {
       whereClause += ` AND l.rack_id = $${i}`;
       filterValues.push(rackId);
+      i++;
+    }
+    if (isRented === 'true' || isRented === 'false') {
+      whereClause += ` AND l.is_rented = $${i}`;
+      filterValues.push(isRented === 'true');
       i++;
     }
 
