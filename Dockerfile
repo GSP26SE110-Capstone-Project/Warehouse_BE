@@ -1,23 +1,15 @@
-# Sử dụng Node.js LTS version
 FROM node:18-alpine
 
-# Thiết lập thư mục làm việc
+RUN apk add --no-cache python3 make g++ libc6-compat
+
 WORKDIR /app
 
-# Copy package.json và package-lock.json
 COPY package*.json ./
 
-# Cài đặt dependencies
 RUN npm install
 
-# Copy toàn bộ source code
-COPY src ./src
-COPY server.js ./
 COPY . .
 
-# Expose port
 EXPOSE 3000
 
-# Chạy ứng dụng
 CMD ["npm", "start"]
-

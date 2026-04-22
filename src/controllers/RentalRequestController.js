@@ -6,11 +6,35 @@ import { tableName as USER_TABLE } from '../models/User.js';
 import { tableName as TENANT_TABLE } from '../models/Tenant.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
 
-function trimTenantId(value) {
+function trimId(value) {
   if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') return String(value);
+  if (typeof value !== 'string') return String(value).trim() || null;
   const t = value.trim();
   return t === '' ? null : t;
+}
+
+/**
+ * Resolve tenantId từ userId (body) hoặc user đang đăng nhập (JWT).
+ * Trả về { tenantId, userId, error? }.
+ */
+async function resolveTenantFromUser(bodyUserId, reqUser) {
+  const candidateUserId = trimId(bodyUserId) || reqUser?.userId || null;
+  if (!candidateUserId) {
+    return { error: 'Thiếu userId. Gửi userId trong body hoặc đăng nhập.' };
+  }
+
+  const { rows } = await pool.query(
+    `SELECT user_id, tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+    [candidateUserId],
+  );
+  if (rows.length === 0) {
+    return { error: `userId "${candidateUserId}" không tồn tại` };
+  }
+  const tenantId = rows[0].tenant_id ? String(rows[0].tenant_id).trim() : null;
+  if (!tenantId) {
+    return { error: `User "${candidateUserId}" chưa được gắn với tenant nào` };
+  }
+  return { userId: candidateUserId, tenantId };
 }
 
 // Map DB row -> domain object
@@ -74,8 +98,8 @@ function validateRentalRequestPayload(payload, { isUpdate = false } = {}) {
   if (customerType && !['individual', 'business'].includes(customerType)) {
     return 'customerType chỉ chấp nhận individual hoặc business';
   }
-  if (payload.tenantId !== undefined && (!String(payload.tenantId).trim())) {
-    return 'tenantId không hợp lệ';
+  if (payload.userId !== undefined && !String(payload.userId).trim()) {
+    return 'userId không hợp lệ';
   }
 
   const rentalType = String(payload.rentalType || '').toUpperCase();
@@ -138,7 +162,7 @@ async function createNotifications(client, userIds, { type, title, content }) {
 export async function createRentalRequest(req, res) {
   const {
     customerType,
-    tenantId,
+    userId,
     warehouseId,
     rentalType,
     requestedStartDate,
@@ -153,7 +177,7 @@ export async function createRentalRequest(req, res) {
 
   const validationError = validateRentalRequestPayload({
     customerType,
-    tenantId: trimTenantId(tenantId),
+    userId: trimId(userId),
     warehouseId,
     rentalType,
     requestedStartDate,
@@ -174,31 +198,18 @@ export async function createRentalRequest(req, res) {
   const normalizedTermValue = Number(rentalTermValue);
   const computedDurationDays = calculateDurationDays(normalizedTermUnit, normalizedTermValue);
 
-  const tenantIdFromBody = trimTenantId(tenantId);
-  let effectiveTenantId = tenantIdFromBody;
-
-  if (!effectiveTenantId && req.user?.userId) {
-    const { rows: userRows } = await pool.query(
-      `SELECT tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
-      [req.user.userId],
-    );
-    effectiveTenantId = userRows[0]?.tenant_id ? String(userRows[0].tenant_id).trim() : null;
-    if (effectiveTenantId === '') effectiveTenantId = null;
+  const resolved = await resolveTenantFromUser(userId, req.user);
+  if (resolved.error) {
+    return res.status(400).json({ message: resolved.error });
   }
-
-  if (!effectiveTenantId) {
-    return res.status(400).json({
-      message:
-        'Thiếu tenantId. Hãy gửi tenantId trong body hoặc đăng nhập bằng user đã gắn tenant.',
-    });
-  }
+  const effectiveTenantId = resolved.tenantId;
 
   const { rows: tenantRows } = await pool.query(
     `SELECT 1 FROM ${TENANT_TABLE} WHERE tenant_id = $1 LIMIT 1`,
     [effectiveTenantId],
   );
   if (tenantRows.length === 0) {
-    return res.status(400).json({ message: 'tenantId không tồn tại trong hệ thống' });
+    return res.status(400).json({ message: 'Tenant liên kết với user không tồn tại trong hệ thống' });
   }
 
   const requestId = await generatePrefixedId(pool, {
@@ -262,10 +273,10 @@ export async function createRentalRequest(req, res) {
     }
     console.error('Error creating rental request:', error);
     if (error.code === '23502') {
-      return res.status(400).json({ message: 'Dữ liệu không hợp lệ: thiếu giá trị bắt buộc (ví dụ tenant_id)' });
+      return res.status(400).json({ message: 'Dữ liệu không hợp lệ: thiếu giá trị bắt buộc' });
     }
     if (error.code === '23503') {
-      return res.status(400).json({ message: 'Không thể tạo rental request: warehouseId hoặc tenantId không tồn tại' });
+      return res.status(400).json({ message: 'Không thể tạo rental request: warehouseId hoặc tenant (suy ra từ user) không tồn tại' });
     }
     return res.status(500).json({ message: 'Lỗi server' });
   } finally {
@@ -276,7 +287,7 @@ export async function createRentalRequest(req, res) {
 // GET /rental-requests - Danh sách rental requests
 export async function listRentalRequests(req, res) {
   try {
-    const { page = 1, limit = 10, status, tenantId } = req.query;
+    const { page = 1, limit = 10, status, userId } = req.query;
     const limitNum = Math.max(1, parseInt(limit, 10) || 10);
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const offset = (pageNum - 1) * limitNum;
@@ -287,9 +298,21 @@ export async function listRentalRequests(req, res) {
       filterParts.push(`rr.status = $${filterValues.length + 1}`);
       filterValues.push(status);
     }
-    if (tenantId) {
+    const trimmedUserId = trimId(userId);
+    if (trimmedUserId) {
+      const { rows: userRows } = await pool.query(
+        `SELECT tenant_id FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+        [trimmedUserId],
+      );
+      const filterTenantId = userRows[0]?.tenant_id ? String(userRows[0].tenant_id).trim() : null;
+      if (!filterTenantId) {
+        return res.json({
+          requests: [],
+          pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
+        });
+      }
       filterParts.push(`rr.tenant_id = $${filterValues.length + 1}`);
-      filterValues.push(tenantId);
+      filterValues.push(filterTenantId);
     }
     const whereClause = filterParts.length ? ` AND ${filterParts.join(' AND ')}` : '';
 
@@ -388,7 +411,6 @@ export async function updateRentalRequest(req, res) {
     // Build dynamic update query
     const allowedFields = [
       'customerType',
-      'tenantId',
       'warehouseId',
       'rentalType',
       'requestedStartDate',
@@ -404,6 +426,17 @@ export async function updateRentalRequest(req, res) {
     const fields = [];
     const values = [];
     let paramIndex = 1;
+
+    // Nếu client gửi userId để đổi tenant, resolve và cập nhật tenant_id
+    if (updates.userId !== undefined) {
+      const resolved = await resolveTenantFromUser(updates.userId, null);
+      if (resolved.error) {
+        return res.status(400).json({ message: resolved.error });
+      }
+      fields.push(`tenant_id = $${paramIndex}`);
+      values.push(resolved.tenantId);
+      paramIndex++;
+    }
 
     Object.keys(updates).forEach(key => {
       if (
