@@ -20,6 +20,7 @@ import pool from '../config/db.js';
 import bcrypt from 'bcrypt';
 import { tableName as USER_TABLE } from '../models/User.js';
 import { generatePrefixedId } from '../utils/idGenerator.js';
+import { revokeAllForUser as revokeAllRefreshTokensForUser } from '../services/RefreshTokenService.js';
 
 /**
  * Số vòng salt bcrypt khi hash password.
@@ -432,6 +433,12 @@ export async function deleteUser(req, res) {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    // Ban/deactivate = revoke mọi refresh token đang sống của user,
+    // buộc họ không refresh được access token mới. Access token hiện
+    // hành vẫn hợp lệ tới khi hết hạn (stateless JWT) — nhưng TTL ngắn
+    // nên ảnh hưởng tối đa vài phút.
+    await revokeAllRefreshTokensForUser(user.userId);
 
     return res.json({
       message: 'Account deactivated successfully',

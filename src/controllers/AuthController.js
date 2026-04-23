@@ -25,6 +25,28 @@ import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/EmailService.js';
 import { signAccessToken } from '../services/JwtService.js';
+import {
+  issueRefreshToken,
+  revokeAllForUser as revokeAllRefreshTokensForUser,
+} from '../services/RefreshTokenService.js';
+
+/**
+ * Trích User-Agent + IP từ req để gắn vào refresh token (phục vụ audit
+ * / "logout all" trên device cụ thể). Không log raw — chỉ cắt 500/64 ký tự
+ * ở service layer.
+ *
+ * @param {import('express').Request} req
+ */
+function extractClientContext(req) {
+  return {
+    userAgent: req?.headers?.['user-agent'] || null,
+    ipAddress:
+      req?.ip ||
+      req?.headers?.['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+      req?.socket?.remoteAddress ||
+      null,
+  };
+}
 
 /**
  * Sinh tenant_id kế tiếp theo pattern TN#### trong cùng transaction.
@@ -465,10 +487,17 @@ export async function login(req, res) {
     delete user.passwordHash;
 
     const accessToken = signAccessToken(user);
+    // Refresh token: opaque string, server lưu SHA-256 hash. Client phải
+    // giữ an toàn (httpOnly cookie hoặc secure storage) và gửi qua
+    // POST /api/auth/refresh để lấy access token mới khi hết hạn.
+    const { plainToken: refreshToken, expiresAt: refreshTokenExpiresAt } =
+      await issueRefreshToken(user.userId, extractClientContext(req));
 
     return res.json({
       user,
       accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
     });
   } catch (err) {
     console.error('Error in login:', err);
@@ -632,11 +661,18 @@ export async function verifyRegisterOtp(req, res) {
       const user = mapUserRow(userRow);
       delete user.passwordHash;
       const accessToken = signAccessToken(user);
+      // Issue refresh token sau khi COMMIT — không cần rollback nếu
+      // bước này fail (OTP đã được consume, user đã active). Nhưng ta
+      // vẫn ôm vào try/catch ngoài để trả 500 đúng nghĩa.
+      const { plainToken: refreshToken, expiresAt: refreshTokenExpiresAt } =
+        await issueRefreshToken(user.userId, extractClientContext(req));
 
       return res.json({
         message: 'Kích hoạt tài khoản thành công',
         user,
         accessToken,
+        refreshToken,
+        refreshTokenExpiresAt,
       });
     } catch (txErr) {
       await client.query('ROLLBACK');
@@ -944,6 +980,11 @@ export async function resetPassword(req, res) {
         WHERE id = $1;
       `;
       await client.query(markUsedQuery, [otpRow.id]);
+
+      // Revoke tất cả refresh token hiện có của user trong cùng transaction
+      // — đổi mật khẩu xong phải logout mọi phiên (kể cả device khác)
+      // để ngăn attacker đã có access/refresh token cũ tiếp tục dùng.
+      await revokeAllRefreshTokensForUser(uid, client);
 
       await client.query('COMMIT');
 

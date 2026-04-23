@@ -47,7 +47,14 @@ router.post('/register', register);
  * /api/auth/login:
  *   post:
  *     tags: [Auth]
- *     summary: Login by email or phone and receive JWT
+ *     summary: Login by email or phone and receive access + refresh token
+ *     description: |
+ *       Trả về cặp `accessToken` (JWT, TTL ngắn) và `refreshToken`
+ *       (opaque string, TTL dài — mặc định 30 ngày). Khi access token hết hạn,
+ *       FE gọi `POST /api/auth/refresh` với `refreshToken` để lấy cặp mới.
+ *
+ *       Lưu refreshToken ở nơi an toàn (httpOnly cookie / secure storage).
+ *       KHÔNG đưa vào localStorage nếu có thể tránh.
  *     requestBody:
  *       required: true
  *       content:
@@ -64,6 +71,26 @@ router.post('/register', register);
  *     responses:
  *       200:
  *         description: Login success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                 accessToken:
+ *                   type: string
+ *                   description: JWT access token (gửi trong header Authorization).
+ *                 refreshToken:
+ *                   type: string
+ *                   description: Opaque refresh token (chỉ trả 1 lần duy nhất).
+ *                 refreshTokenExpiresAt:
+ *                   type: string
+ *                   format: date-time
+ *       401:
+ *         description: Sai email/phone hoặc password
+ *       403:
+ *         description: Tài khoản chưa kích hoạt hoặc đã bị khóa
  */
 // Đăng nhập bằng email hoặc phone + password
 router.post('/login', login);
@@ -93,7 +120,25 @@ router.post('/login', login);
  *                 type: string
  *     responses:
  *       200:
- *         description: Account activated successfully
+ *         description: |
+ *           Kích hoạt tài khoản thành công. Response tương tự `/login`:
+ *           trả cả `accessToken` (JWT) và `refreshToken` (opaque).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 refreshTokenExpiresAt:
+ *                   type: string
+ *                   format: date-time
  */
 // Xác thực OTP cho user vừa register
 router.post('/verify-register-otp', verifyRegisterOtp);
