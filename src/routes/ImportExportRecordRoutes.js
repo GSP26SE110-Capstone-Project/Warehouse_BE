@@ -160,6 +160,14 @@ router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), getImp
  *   patch:
  *     tags: [ImportExportRecords]
  *     summary: Cập nhật phiếu nhập/xuất
+ *     description: |
+ *       Cập nhật một hoặc nhiều field của phiếu nhập/xuất. Gửi body chứa **ít nhất 1** field
+ *       trong danh sách bên dưới; các field không gửi sẽ giữ nguyên giá trị cũ.
+ *
+ *       Các field không được phép: `recordId`, `createdAt`, `updatedAt` (server bỏ qua nếu client cố gửi).
+ *
+ *       Nếu đổi `scopeType` thì phải kèm `zoneId`/`slotId` tương ứng (ZONE→zoneId, SLOT→slotId,
+ *       WAREHOUSE không cần). Nếu đổi `recordCode` thì phải unique.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -168,9 +176,93 @@ router.get('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), getImp
  *         required: true
  *         schema:
  *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Gửi ít nhất 1 field trong các field dưới đây
+ *             properties:
+ *               contractId:
+ *                 type: string
+ *               warehouseId:
+ *                 type: string
+ *               scopeType:
+ *                 type: string
+ *                 enum: [WAREHOUSE, ZONE, SLOT]
+ *               zoneId:
+ *                 type: string
+ *                 nullable: true
+ *               slotId:
+ *                 type: string
+ *                 nullable: true
+ *               recordType:
+ *                 type: string
+ *                 enum: [IMPORT, EXPORT]
+ *               recordCode:
+ *                 type: string
+ *                 description: Mã phiếu (unique)
+ *               scheduledDatetime:
+ *                 type: string
+ *                 format: date-time
+ *               actualDatetime:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               quantity:
+ *                 type: number
+ *                 nullable: true
+ *               weight:
+ *                 type: number
+ *                 nullable: true
+ *               isFullZone:
+ *                 type: boolean
+ *               responsibleStaffId:
+ *                 type: string
+ *                 nullable: true
+ *               vehiclePlateNumber:
+ *                 type: string
+ *                 nullable: true
+ *               driverName:
+ *                 type: string
+ *                 nullable: true
+ *               driverCitizenId:
+ *                 type: string
+ *                 nullable: true
+ *               approvedBy:
+ *                 type: string
+ *                 nullable: true
+ *               approvedAt:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, APPROVED, COMPLETED, CANCELLED]
+ *               cancelReason:
+ *                 type: string
+ *                 nullable: true
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *           example:
+ *             status: APPROVED
+ *             actualDatetime: "2026-06-10T09:15:00.000Z"
+ *             quantity: 118
+ *             weight: 1480
+ *             approvedBy: USR0001
+ *             approvedAt: "2026-06-10T09:10:00.000Z"
+ *             notes: Đã nhập đủ, thiếu 2 thùng so với phiếu
  *     responses:
  *       200:
  *         description: Record updated
+ *       400:
+ *         description: Body rỗng (không có field hợp lệ) hoặc scopeType/zoneId/slotId không khớp
+ *       404:
+ *         description: Record không tồn tại
+ *       409:
+ *         description: recordCode trùng với phiếu khác
  */
 router.patch('/:id', requireAuth, requireRoles('admin', 'warehouse_staff'), updateImportExportRecord);
 

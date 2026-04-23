@@ -25,6 +25,31 @@ import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { sendVerificationEmail, sendForgotPasswordEmail } from '../services/EmailService.js';
 import { signAccessToken } from '../services/JwtService.js';
+import {
+  issueRefreshToken,
+  verifyRefreshToken,
+  revokeRefreshToken,
+  revokeAllForUser as revokeAllRefreshTokensForUser,
+  markReplacedBy,
+} from '../services/RefreshTokenService.js';
+
+/**
+ * Trích User-Agent + IP từ req để gắn vào refresh token (phục vụ audit
+ * / "logout all" trên device cụ thể). Không log raw — chỉ cắt 500/64 ký tự
+ * ở service layer.
+ *
+ * @param {import('express').Request} req
+ */
+function extractClientContext(req) {
+  return {
+    userAgent: req?.headers?.['user-agent'] || null,
+    ipAddress:
+      req?.ip ||
+      req?.headers?.['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+      req?.socket?.remoteAddress ||
+      null,
+  };
+}
 
 /**
  * Sinh tenant_id kế tiếp theo pattern TN#### trong cùng transaction.
@@ -465,10 +490,17 @@ export async function login(req, res) {
     delete user.passwordHash;
 
     const accessToken = signAccessToken(user);
+    // Refresh token: opaque string, server lưu SHA-256 hash. Client phải
+    // giữ an toàn (httpOnly cookie hoặc secure storage) và gửi qua
+    // POST /api/auth/refresh để lấy access token mới khi hết hạn.
+    const { plainToken: refreshToken, expiresAt: refreshTokenExpiresAt } =
+      await issueRefreshToken(user.userId, extractClientContext(req));
 
     return res.json({
       user,
       accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
     });
   } catch (err) {
     console.error('Error in login:', err);
@@ -632,11 +664,18 @@ export async function verifyRegisterOtp(req, res) {
       const user = mapUserRow(userRow);
       delete user.passwordHash;
       const accessToken = signAccessToken(user);
+      // Issue refresh token sau khi COMMIT — không cần rollback nếu
+      // bước này fail (OTP đã được consume, user đã active). Nhưng ta
+      // vẫn ôm vào try/catch ngoài để trả 500 đúng nghĩa.
+      const { plainToken: refreshToken, expiresAt: refreshTokenExpiresAt } =
+        await issueRefreshToken(user.userId, extractClientContext(req));
 
       return res.json({
         message: 'Kích hoạt tài khoản thành công',
         user,
         accessToken,
+        refreshToken,
+        refreshTokenExpiresAt,
       });
     } catch (txErr) {
       await client.query('ROLLBACK');
@@ -945,6 +984,11 @@ export async function resetPassword(req, res) {
       `;
       await client.query(markUsedQuery, [otpRow.id]);
 
+      // Revoke tất cả refresh token hiện có của user trong cùng transaction
+      // — đổi mật khẩu xong phải logout mọi phiên (kể cả device khác)
+      // để ngăn attacker đã có access/refresh token cũ tiếp tục dùng.
+      await revokeAllRefreshTokensForUser(uid, client);
+
       await client.query('COMMIT');
 
       const user = mapUserRow(userRow);
@@ -963,6 +1007,200 @@ export async function resetPassword(req, res) {
   }
 }
 
+/**
+ * POST /api/auth/refresh — Đổi refresh token lấy cặp access+refresh mới.
+ *
+ * Flow:
+ *   1. Verify plaintext refresh token (SHA-256 → lookup bảng refresh_tokens).
+ *   2. Nếu `not_found` / `expired` → 401.
+ *   3. Nếu `revoked` → 401 + revoke TẤT CẢ refresh token của user đó
+ *      (dấu hiệu reuse: attacker đã rotate nó rồi, victim đang gửi token cũ
+ *      — hoặc ngược lại. Cách an toàn là buộc tất cả phiên re-login).
+ *   4. Lấy user từ DB (phải check lại is_active, tránh case user bị ban
+ *      sau khi access token đã cấp).
+ *   5. Atomic: issue refresh token mới → markReplacedBy(oldTokenId, newTokenId).
+ *   6. Sign access token mới.
+ *   7. Trả { user, accessToken, refreshToken, refreshTokenExpiresAt }.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+export async function refreshAccessToken(req, res) {
+  try {
+    const { refreshToken: incomingToken } = req.body || {};
+
+    if (!incomingToken || typeof incomingToken !== 'string') {
+      return res.status(400).json({ message: 'refreshToken là bắt buộc' });
+    }
+
+    const result = await verifyRefreshToken(incomingToken);
+    if (!result.valid) {
+      if (result.reason === 'revoked' && result.userId) {
+        // Reuse detected — kill tất cả session của user để chặn attacker.
+        await revokeAllRefreshTokensForUser(result.userId);
+        return res.status(401).json({
+          message: 'Refresh token đã bị revoke. Vui lòng đăng nhập lại.',
+        });
+      }
+      return res.status(401).json({
+        message:
+          result.reason === 'expired'
+            ? 'Refresh token đã hết hạn'
+            : 'Refresh token không hợp lệ',
+      });
+    }
+
+    const oldRow = result.row;
+
+    const userQuery = `
+      SELECT *
+      FROM ${USER_TABLE}
+      WHERE user_id = $1
+      LIMIT 1;
+    `;
+    const { rows: userRows } = await pool.query(userQuery, [oldRow.user_id]);
+    const userRow = userRows[0];
+    if (!userRow) {
+      return res.status(401).json({ message: 'User không còn tồn tại' });
+    }
+
+    const isUserActive =
+      userRow.status ? userRow.status === 'active' : userRow.is_active === true;
+    if (!isUserActive) {
+      // Nếu user bị deactivate giữa chừng, revoke tất cả và từ chối.
+      await revokeAllRefreshTokensForUser(userRow.user_id);
+      return res.status(403).json({ message: 'Tài khoản đã bị khóa' });
+    }
+
+    const user = mapUserRow(userRow);
+    delete user.passwordHash;
+
+    // Issue + mark old-as-replaced trong cùng transaction để tránh race:
+    // nếu 2 request refresh song song cùng token, chỉ 1 thắng.
+    const client = await pool.connect();
+    let newToken;
+    try {
+      await client.query('BEGIN');
+      newToken = await issueRefreshToken(user.userId, {
+        ...extractClientContext(req),
+        client,
+      });
+      await markReplacedBy(oldRow.token_id, newToken.tokenId, client);
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    const accessToken = signAccessToken(user);
+
+    return res.json({
+      user,
+      accessToken,
+      refreshToken: newToken.plainToken,
+      refreshTokenExpiresAt: newToken.expiresAt,
+    });
+  } catch (err) {
+    console.error('Error in refreshAccessToken:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * POST /api/auth/logout — Logout phiên hiện tại (revoke 1 refresh token).
+ *
+ * Idempotent: nếu token không tồn tại/đã revoke, vẫn trả 200 để client
+ * không phải xử lý case riêng.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+export async function logout(req, res) {
+  try {
+    const { refreshToken: incomingToken } = req.body || {};
+    if (incomingToken && typeof incomingToken === 'string') {
+      await revokeRefreshToken(incomingToken);
+    }
+    return res.json({ message: 'Logout thành công' });
+  } catch (err) {
+    console.error('Error in logout:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * POST /api/auth/logout-all — Logout tất cả phiên của user hiện tại.
+ *
+ * Yêu cầu access token (requireAuth ở route). Hữu ích cho nút "Đăng xuất
+ * mọi thiết bị" hoặc khi user nghi ngờ tài khoản bị xâm nhập.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+export async function logoutAll(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const revokedCount = await revokeAllRefreshTokensForUser(userId);
+    return res.json({
+      message: 'Đã đăng xuất khỏi tất cả thiết bị',
+      revokedCount,
+    });
+  } catch (err) {
+    console.error('Error in logoutAll:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/auth/me — Lấy thông tin user hiện tại từ access token.
+ *
+ * Dùng để:
+ *   - FE bootstrap session sau khi refresh trang (có token trong storage
+ *     nhưng chưa có user object).
+ *   - Kiểm tra access token còn hợp lệ + user chưa bị ban.
+ *
+ * Trả về từ DB (không phải từ JWT claims) để luôn có data mới nhất
+ * (role, status có thể đã đổi sau khi token được cấp).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+export async function getMe(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT * FROM ${USER_TABLE} WHERE user_id = $1 LIMIT 1`,
+      [userId],
+    );
+    const userRow = rows[0];
+    if (!userRow) {
+      return res.status(404).json({ message: 'User không tồn tại' });
+    }
+
+    const isUserActive =
+      userRow.status ? userRow.status === 'active' : userRow.is_active === true;
+    if (!isUserActive) {
+      return res.status(403).json({ message: 'Tài khoản đã bị khóa' });
+    }
+
+    const user = mapUserRow(userRow);
+    delete user.passwordHash;
+    return res.json({ user });
+  } catch (err) {
+    console.error('Error in getMe:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 export default {
   register,
   login,
@@ -970,5 +1208,9 @@ export default {
   resendRegisterOtp,
   forgotPassword,
   resetPassword,
+  refreshAccessToken,
+  logout,
+  logoutAll,
+  getMe,
 };
 
