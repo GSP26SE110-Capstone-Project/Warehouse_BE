@@ -1,7 +1,7 @@
 # Hướng dẫn thực hiện từng Function (Manual Test Guide)
 
-> **Mục đích**: Hướng dẫn từng bước làm / test 66 function trong `docs/all_role_func.md`.
-> **Phiên bản**: 1.0 — 2026-05-30.
+> **Mục đích**: Hướng dẫn từng bước làm / test 69 function trong `docs/all_role_func.md`.
+> **Phiên bản**: 1.1 — 2026-05-30.
 > **Tham chiếu**: `docs/all_role_func.md`, `docs/request.md`, Swagger `http://localhost:3000/api-docs`.
 
 ---
@@ -996,6 +996,84 @@ POST /api/inbound-requests/{id}/report-arrival
 
 ---
 
+# AUTHENTICATION — PASSWORD & OTP (67–69)
+
+---
+
+### #67 Forgot Password ⏳
+
+| | |
+|---|---|
+| **Role** | Guest (unauthenticated) |
+| **Login** | Không cần đăng nhập |
+
+**Điều kiện**: User `ACTIVE` có token reset hợp lệ (email welcome khi tạo tài khoản) hoặc email đã đăng ký (khi API forgot sẵn sàng).
+
+**FE**:
+1. `/login` → click **Quên mật khẩu?**
+2. Trang `/forgot-password` → nhập email → click **Gửi yêu cầu** *(API gửi email — chưa nối FE)*
+3. Mở `/reset-password?token=...` (từ email welcome / token test)
+4. Nhập **Mật khẩu mới** + **Xác nhận mật khẩu** → click **Đặt lại mật khẩu**
+5. `/login` → đăng nhập bằng mật khẩu mới
+
+**API** (reset khi đã có token):
+```http
+POST /api/auth/reset-password
+{ "token": "<password_reset_jwt>", "newPassword": "NewPass@12345" }
+```
+
+**Kết quả**: Thông báo **"Đặt lại mật khẩu thành công."** · Login được với mật khẩu mới.
+
+---
+
+### #68 Change Password ✅ (BE) · ⏳ (FE)
+
+| | |
+|---|---|
+| **Role** | Mọi user đã đăng nhập (`ACTIVE`) |
+| **Login** | Ví dụ `admin@warehouse.local` / `admin12345` |
+
+**Điều kiện**: User có email (nhận OTP). Bearer token sau khi login.
+
+**FE**: Chưa có form đổi mật khẩu + OTP — test qua Swagger.
+
+**API**:
+```http
+POST /api/auth/change-password
+Authorization: Bearer <accessToken>
+{ "currentPassword": "admin12345", "newPassword": "AdminNew@12345" }
+```
+
+**Kết quả**: **"OTP đã được gửi tới email. Nhập OTP để hoàn tất đổi mật khẩu."** · OTP 6 số, TTL **10 phút**.
+
+**Test tiếp**: #69 với OTP vừa nhận.
+
+---
+
+### #69 Verify OTP ✅ (BE) · ⏳ (FE)
+
+| | |
+|---|---|
+| **Role** | Mọi user đã đăng nhập (`ACTIVE`) |
+| **Login** | Cùng session với #68 |
+
+**Điều kiện**: Đã gọi thành công #68 (OTP còn hạn, chưa khóa sau 5 lần sai).
+
+**FE**: Chưa có màn nhập OTP — test qua Swagger.
+
+**API**:
+```http
+POST /api/auth/change-password/verify
+Authorization: Bearer <accessToken>
+{ "otp": "482931" }
+```
+
+**Kết quả**: **"Đổi mật khẩu thành công."** · OTP dùng một lần.
+
+**Test tiếp**: Logout → login bằng mật khẩu mới từ #68.
+
+---
+
 ## Checklist demo Capstone (15 phút)
 
 | Bước | Function # | Ai làm | Màn hình |
@@ -1020,6 +1098,8 @@ POST /api/inbound-requests/{id}/report-arrival
 | `Trip is not assigned to you` | Transporter chưa được gán | WH Admin làm #29 |
 | `vehiclePlate is required` | Chưa nhập biển số | Transporter #65 trước #66 |
 | Dropdown SKU trống | Chưa tạo SKU | Tenant #40 |
+| `OTP_EXPIRED` / `OTP_LOCKED` | OTP hết hạn hoặc sai quá 5 lần | Gọi lại #68 |
+| `RESET_TOKEN_INVALID` | Link reset hết hạn / sai token | Tạo user mới hoặc chờ API forgot #67 |
 
 ---
 
@@ -1029,8 +1109,8 @@ POST /api/inbound-requests/{id}/report-arrival
 
 # Test Case Specification (English) — All Roles
 
-> **Reference**: `docs/all_role_func.md` (#1–#66)  
-> **Version**: 1.1 — 2026-05-30  
+> **Reference**: `docs/all_role_func.md` (#1–#69)  
+> **Version**: 1.2 — 2026-05-30  
 > **Test environment**: FE `http://localhost:5173` · BE `http://localhost:3000` · Swagger `http://localhost:3000/api-docs`
 
 ### Global test accounts
@@ -1418,6 +1498,51 @@ POST /api/inbound-requests/{id}/report-arrival
 
 ---
 
+# Authentication — Test Cases (#67–#69)
+
+## **Forgot Password** (#67)
+
+> **Role**: Guest (unauthenticated)
+
+| Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
+|--------------|----------------------|---------------------|------------------|----------------|
+| TC_AUTH_001 | Reset password successfully | 1. Open `/reset-password?token={valid_token}` (from welcome email when user is created, or test token).<br>2. Enter **Mật khẩu mới** and matching **Xác nhận mật khẩu** (≥ 8 characters).<br>3. Click **Đặt lại mật khẩu**.<br>4. Navigate to `/login` and log in with the new password. | • Success message: **"Đặt lại mật khẩu thành công."**<br>• Login with new password succeeds. | • Valid `password_reset` token for an `ACTIVE` user. |
+| TC_AUTH_002 | Submit forgot password request (API pending) | 1. Navigate to `/login`.<br>2. Click **Quên mật khẩu?**.<br>3. On `/forgot-password`, enter a registered email.<br>4. Click **Gửi yêu cầu**. | • Document as **Not yet implemented** — FE does not call forgot-password API yet.<br>• When implemented: reset email sent to user. | • User with that email exists in system. |
+| TC_AUTH_003 | Reset password fails — invalid or missing token | 1. Open `/reset-password` without `token` in URL, or with expired/invalid token.<br>2. Enter **Mật khẩu mới** and **Xác nhận mật khẩu**.<br>3. Click **Đặt lại mật khẩu**. | • FE warning: link invalid or missing token.<br>• HTTP `400`, code `RESET_TOKEN_INVALID`.<br>• Password is not changed. | • No valid reset token. |
+| TC_AUTH_004 | Reset password fails — password mismatch | 1. Open `/reset-password?token={valid_token}`.<br>2. Enter different values in **Mật khẩu mới** and **Xác nhận mật khẩu**.<br>3. Click **Đặt lại mật khẩu**. | • FE error: **"Mật khẩu không khớp."**<br>• Password is not changed. | • Valid reset token. |
+| TC_AUTH_005 | Reset password fails — inactive account | 1. Set target user status to `INACTIVE`.<br>2. Call `POST /api/auth/reset-password` via Swagger with valid token for that user. | • HTTP `403 Forbidden`, code `ACCOUNT_INACTIVE`.<br>• Message: **"Account is not active"**.<br>• Password is not changed. | • User is `INACTIVE`. |
+
+---
+
+## **Change Password** (#68)
+
+> **Role**: Any authenticated user (`ACTIVE`, has email)
+
+| Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
+|--------------|----------------------|---------------------|------------------|----------------|
+| TC_AUTH_006 | Request password change OTP successfully | 1. Log in as System Admin (`admin@warehouse.local`).<br>2. Call `POST /api/auth/change-password` via Swagger (Bearer token) with `{ "currentPassword": "admin12345", "newPassword": "AdminNew@12345" }`. | • Success message: **"OTP đã được gửi tới email. Nhập OTP để hoàn tất đổi mật khẩu."**<br>• 6-digit OTP sent to user email (TTL 10 minutes). | • System Admin account is `ACTIVE` with email configured.<br>• SMTP configured in BE. |
+| TC_AUTH_007 | Change password fails — incorrect current password | 1. Log in as System Admin.<br>2. Call `POST /api/auth/change-password` with wrong `currentPassword`. | • HTTP `401 Unauthorized`.<br>• Message: **"Current password is incorrect"**.<br>• No OTP is sent. | • System Admin is logged in. |
+| TC_AUTH_008 | Change password fails — new password same as current | 1. Log in as System Admin.<br>2. Call `POST /api/auth/change-password` with `newPassword` equal to `currentPassword`. | • HTTP `400 Bad Request`.<br>• Message: **"New password must differ from current password"**.<br>• No OTP is sent. | • System Admin is logged in. |
+| TC_AUTH_009 | Change password fails — weak new password | 1. Log in as System Admin.<br>2. Call `POST /api/auth/change-password` with `newPassword` shorter than 8 characters. | • HTTP `400 Bad Request`.<br>• Validation error: password minimum 8 characters.<br>• No OTP is sent. | • System Admin is logged in. |
+| TC_AUTH_010 | Change password requires authentication | 1. Call `POST /api/auth/change-password` without Bearer token. | • HTTP `401 Unauthorized`. | • No access token. |
+
+---
+
+## **Verify OTP** (#69)
+
+> **Role**: Any authenticated user (`ACTIVE`, has email)
+
+| Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
+|--------------|----------------------|---------------------|------------------|----------------|
+| TC_AUTH_011 | Verify OTP and change password successfully | 1. Complete TC_AUTH_006.<br>2. Log in as the same user (Bearer token).<br>3. Call `POST /api/auth/change-password/verify` via Swagger with `{ "otp": "<6-digit from email>" }`.<br>4. Log out and log in with the new password from TC_AUTH_006. | • Success message: **"Đổi mật khẩu thành công."**<br>• Login with new password succeeds; old password rejected.<br>• OTP cannot be reused. | • Pending OTP from TC_AUTH_006 (not expired). |
+| TC_AUTH_012 | Verify OTP fails — incorrect OTP | 1. Complete TC_AUTH_006.<br>2. Call `POST /api/auth/change-password/verify` with wrong OTP. | • HTTP `400`, code `OTP_MISMATCH`.<br>• Message indicates remaining attempts.<br>• Password is unchanged. | • Pending OTP exists. |
+| TC_AUTH_013 | Verify OTP fails — expired OTP | 1. Complete TC_AUTH_006.<br>2. Wait more than 10 minutes.<br>3. Call `POST /api/auth/change-password/verify` with the original OTP. | • HTTP `400`, code `OTP_EXPIRED`.<br>• Message: **"OTP expired. Request a new one."**<br>• Password is unchanged. | • OTP TTL has elapsed. |
+| TC_AUTH_014 | Verify OTP fails — locked after max attempts | 1. Complete TC_AUTH_006.<br>2. Call `POST /api/auth/change-password/verify` with wrong OTP 5 times in a row. | • HTTP `400`, code `OTP_LOCKED`.<br>• Message: **"Too many wrong attempts. Request a new OTP."**<br>• Must request OTP again (#68). | • Pending OTP exists. |
+| TC_AUTH_015 | Verify OTP fails — no pending request | 1. Log in as System Admin.<br>2. Call `POST /api/auth/change-password/verify` without calling change-password first. | • HTTP `400`, code `OTP_NOT_FOUND`.<br>• Message: **"No pending password change. Request OTP again."** | • No OTP was requested. |
+| TC_AUTH_016 | Verify OTP requires authentication | 1. Call `POST /api/auth/change-password/verify` without Bearer token. | • HTTP `401 Unauthorized`. | • No access token. |
+
+---
+
 ## Test case index summary
 
 | Role / Module | ID prefix | Count | Functions covered |
@@ -1432,7 +1557,8 @@ POST /api/inbound-requests/{id}/report-arrival
 | Warehouse Transporter | `TC_WHTR_` | 20 | #63–#66 |
 | **Inactive User** | `TC_Inactive_User_` | 5 | Deactivate account |
 | **Active User** | `TC_Active_User_` | 5 | Reactivate account |
-| End-to-end | `TC_E2E_` / `TC_*_E2E_` | 3 | Cross-role flows |
-| **Total** | | **128** | **#1–#66 + warehouse CRUD + account status** |
+| **Authentication** | `TC_AUTH_` | 16 | #67–#69 Forgot / Change / Verify OTP |
+| End-to-end | `TC_E2E_` / `TC_*_E2E_` | 4 | Cross-role + auth flows |
+| **Total** | | **144** | **#1–#69 + warehouse CRUD + account status** |
 
-> Cases marked **Not yet implemented** cover invoice (#10, #24, #46, #62), damage (#54), and partial outbound UI — update to full pass criteria when APIs/screens are ready.
+> Cases marked **Not yet implemented** cover invoice (#10, #24, #46, #62), damage (#54), partial outbound UI, and **forgot-password email API** (#67 FE submit) — update when ready.
