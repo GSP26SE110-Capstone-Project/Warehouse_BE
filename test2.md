@@ -83,10 +83,10 @@ Onboarding (1–21, 30–32, 37–38)
 **Điều kiện**: Không.
 
 **FE**:
-1. Login System Admin → `/admin/warehouse`
-2. Bấm **Thêm kho** / **Create**
-3. Nhập: `warehouseCode`, `warehouseName`, `address`, `city`, `district`
-4. Save
+1. Đăng nhập System Admin → **Quản lý kho** (`/admin/warehouse`)
+2. Chọn nút **TẠO KHO**
+3. Nhập **Mã kho**, **Tên kho**, **Địa chỉ**, **Tỉnh/Thành phố**, **Quận/Huyện**
+4. Bấm **Tạo kho**
 
 **API**:
 ```http
@@ -108,10 +108,10 @@ POST /api/warehouses
 **Điều kiện**: Warehouse đã tồn tại.
 
 **FE**:
-1. `/admin/warehouse` → icon **Edit** trên dòng kho
+1. `/admin/warehouse` → chọn nút **Chỉnh sửa** (icon edit) trên một kho
 2. Sửa: `warehouseName`, `address`, `city`, `district`, `totalAreaM2`, `usableAreaM2`, `status`
 3. **Lưu ý**: `warehouseCode` **không sửa được** khi edit (field disabled)
-4. Save → thông báo **"Cập nhật thành công"**
+4. Bấm **Cập nhật** → thông báo **"Cập nhật thành công"**
 
 **API**:
 ```http
@@ -148,11 +148,11 @@ PATCH /api/warehouses/{warehouseId}
 | **Role** | System Admin only |
 | **Login** | `admin@warehouse.local` |
 
-**Điều kiện**: Chỉ System Admin thấy nút **Delete** (`!isWhAdmin` trên FE).
+**Điều kiện**: Chỉ System Admin thấy nút **Xóa** (icon thùng rác).
 
 **FE**:
-1. `/admin/warehouse` → icon **Delete** (thùng rác)
-2. Confirm dialog → **Xóa**
+1. `/admin/warehouse` → chọn nút **Xóa** trên kho cần xóa
+2. Xác nhận hộp thoại **"Bạn có chắc muốn xóa kho ...?"**
 3. Success: **"Xóa thành công"**
 
 **API**:
@@ -180,7 +180,7 @@ DELETE /api/warehouses/{warehouseId}
 |---|---|
 | **Role** | System Admin |
 
-**FE**: `/admin/accounts` → **Thêm tài khoản** → Role = `WH_ADMIN` → chọn `warehouseId` → Save.
+**FE**: `/admin/accounts` → **Thêm tài khoản** → Role = `WH_ADMIN` → chọn `warehouseId` → Bấm **Lưu thay đổi**
 
 **API**:
 ```http
@@ -204,7 +204,7 @@ POST /api/users
 |---|---|
 | **Role** | System Admin |
 
-**FE**: `/admin/accounts` → Role = `TENANT_ADMIN` → chọn `tenantId` → Save.
+**FE**: `/admin/accounts` → Role = `TENANT_ADMIN` → chọn `tenantId` → Bấm **Lưu thay đổi**
 
 **API**:
 ```http
@@ -254,7 +254,7 @@ POST /api/seasons       { "seasonCode": "SS26", "seasonName": "Spring Summer 202
 
 **FE**:
 1. `/admin/requests` (hoặc rental request list)
-2. Mở request → **Approve** / chuyển status → `APPROVED`
+2. Mở request → chọn **Duyệt & tiếp** / chuyển status → `APPROVED`
 
 **API**:
 ```http
@@ -338,7 +338,7 @@ PATCH /api/rental-requests/{rentalRequestId}
 
 ### #12 Create Warehouse Zone ✅
 
-**FE**: `/admin/zones` → **Thêm zone** → chọn warehouse, nhập `zoneCode`, `zoneName`, `zoneType` → Save.
+**FE**: `/admin/zones` → **Thêm zone** → chọn warehouse, nhập `zoneCode`, `zoneName`, `zoneType` → Bấm **Lưu thay đổi**
 
 **API**:
 ```http
@@ -617,7 +617,7 @@ POST /api/storage-reservations
 
 ### #37 Create Tenant Staff Account ✅
 
-**FE**: `/staff/accounts` → Role `TENANT_STAFF` → Save.
+**FE**: `/staff/accounts` → Role `TENANT_STAFF` → Bấm **Lưu thay đổi**
 
 **API**:
 ```http
@@ -659,7 +659,7 @@ POST /api/rental-requests
 
 ### #40 Create SKU ✅
 
-**FE**: `/staff/products` → **Thêm SKU** → điền code, tên, category, collection, season → Save.
+**FE**: `/staff/products` → **Thêm SKU** → điền code, tên, category, collection, season → Bấm **Lưu thay đổi**
 
 **API**:
 ```http
@@ -1044,6 +1044,13 @@ POST /api/inbound-requests/{id}/report-arrival
 | Warehouse Transporter | Created by WH Admin | (custom) |
 | Tenant Staff | Created by Tenant Admin | (custom) |
 
+### Quy ước cột **Test Case Procedure** (FE tiếng Việt)
+
+- **Test Case Description** và **Expected Results**: tiếng Anh (chuẩn doc).
+- **Thao tác trên FE**: dùng đúng **nhãn tiếng Việt** (nút, menu, popup, toast).
+- **Thao tác API**: giữ tên endpoint / method.
+- Ví dụ: *Chọn nút **Chỉnh sửa*** thay vì *Click **Edit***; kỳ vọng: **"Cập nhật thành công."**
+
 ---
 
 # System Admin — Test Cases (#1–#11)
@@ -1054,10 +1061,10 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_SYS_001 | Create warehouse successfully | 1. Log in as System Admin.<br>2. Navigate to `/admin/warehouse`.<br>3. Click **Add warehouse**.<br>4. Enter `warehouseCode`, `warehouseName`, `city`, `district`, areas.<br>5. Save. | • Success message: **"Warehouse created successfully."** (or *"Tạo kho thành công."*).<br>• New warehouse appears in list with status `ACTIVE`. | • System Admin account is `ACTIVE`. |
-| TC_SYS_002 | Create warehouse fails with duplicate code | 1. Log in as System Admin.<br>2. Create warehouse with an existing `warehouseCode`. | • HTTP `409 Conflict`, code `DUPLICATE`.<br>• Message indicates **warehouse code already exists**.<br>• No duplicate record created. | • Warehouse with same `warehouseCode` already exists. |
-| TC_SYS_002E | Create warehouse fails — missing required fields | 1. Log in as System Admin.<br>2. Submit create form without `warehouseCode` or `warehouseName`. | • HTTP `400 Bad Request`.<br>• Message: **"warehouseCode is required"** or **"warehouseName is required"**. | • System Admin is logged in. |
-| TC_SYS_002F | Non–System Admin cannot create warehouse | 1. Log in as Warehouse Admin.<br>2. Call `POST /api/warehouses`. | • HTTP `403 Forbidden`.<br>• Message: **"SYSTEM_ADMIN only"**. | • WH Admin account is `ACTIVE`. |
+| TC_SYS_001 | Create warehouse successfully | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập trang **Quản lý kho** (`/admin/warehouse`).<br>3. Chọn nút **TẠO KHO**.<br>4. Trong popup **Tạo kho**, nhập **Mã kho**, **Tên kho**, **Tỉnh/Thành phố**, **Quận/Huyện**, diện tích (nếu có).<br>5. Bấm **Tạo kho**. | • Thông báo: **"Tạo kho thành công."**<br>• Kho mới hiển thị trong danh sách, trạng thái `ACTIVE`. | • Tài khoản System Admin đang `ACTIVE`. |
+| TC_SYS_002 | Create warehouse fails with duplicate code | 1. Đăng nhập System Admin.<br>2. Chọn **TẠO KHO** và nhập **Mã kho** đã tồn tại.<br>3. Bấm **Tạo kho**. | • HTTP `409 Conflict`, code `DUPLICATE`.<br>• Thông báo lỗi: mã kho đã tồn tại.<br>• Không tạo bản ghi trùng. | • Đã có kho với cùng `warehouseCode`. |
+| TC_SYS_002E | Create warehouse fails — missing required fields | 1. Đăng nhập System Admin.<br>2. Mở popup **Tạo kho**, để trống **Mã kho** hoặc **Tên kho**.<br>3. Bấm **Tạo kho**. | • HTTP `400 Bad Request`.<br>• Thông báo: **"warehouseCode is required"** hoặc **"warehouseName is required"**. | • System Admin đã đăng nhập. |
+| TC_SYS_002F | Non–System Admin cannot create warehouse | 1. Đăng nhập WH Admin.<br>2. Gọi API `POST /api/warehouses` (Swagger). | • HTTP `403 Forbidden`.<br>• Thông báo: **"SYSTEM_ADMIN only"**. | • WH Admin đang `ACTIVE`. |
 
 ---
 
@@ -1065,14 +1072,14 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_Update_Warehouse_001 | Update warehouse information successfully | 1. Log in as System Admin.<br>2. Go to `/admin/warehouse`.<br>3. Click **Edit** on an existing warehouse.<br>4. Change `warehouseName`, `address`, `city`, `district`.<br>5. Save. | • Success message: **"Warehouse updated successfully."** (or *"Cập nhật thành công."*).<br>• Updated fields persist after refresh.<br>• `warehouseCode` remains unchanged. | • Target warehouse exists. |
-| TC_Update_Warehouse_002 | Update warehouse status and area fields | 1. Log in as System Admin.<br>2. Edit warehouse → set `status` to `MAINTENANCE`.<br>3. Set `totalAreaM2 = 5000`, `usableAreaM2 = 4500`.<br>4. Save. | • Status and area values saved.<br>• API: `PATCH /api/warehouses/{id}` returns updated record. | • Warehouse exists.<br>• Sum of zone areas ≤ 4500 m² (if zones exist). |
-| TC_Update_Warehouse_003 | Warehouse code is read-only on edit | 1. Log in as System Admin.<br>2. Open **Edit** modal for a warehouse.<br>3. Observe **Warehouse code** field.<br>4. Save other fields without changing code. | • `warehouseCode` input is **disabled** in edit mode.<br>• After save, `warehouseCode` in DB/list is unchanged. | • Warehouse exists with known code. |
-| TC_Update_Warehouse_004 | Update fails — empty warehouse name | 1. Log in as System Admin.<br>2. Edit warehouse → clear `warehouseName`.<br>3. Save. | • HTTP `400 Bad Request`.<br>• Message: **"warehouseName cannot be empty"**.<br>• Warehouse record unchanged. | • Warehouse exists. |
-| TC_Update_Warehouse_005 | Update fails — usable area exceeds total area | 1. Log in as System Admin.<br>2. `PATCH /api/warehouses/{id}` with `{ "totalAreaM2": 1000, "usableAreaM2": 1500 }`. | • HTTP `400 Bad Request`, code `AREA_EXCEEDS_TOTAL`.<br>• Message indicates usable area cannot exceed total area.<br>• No update applied. | • Warehouse exists. |
-| TC_Update_Warehouse_006 | Update fails — usable area less than existing zone area | 1. Use warehouse with zones totaling 800 m².<br>2. Attempt `PATCH` with `{ "usableAreaM2": 500 }`. | • HTTP `400 Bad Request`, code `ZONE_AREA_EXCEEDS_USABLE`.<br>• Message indicates total zone area exceeds new usable area.<br>• `usableAreaM2` not reduced. | • Warehouse has zones summing to 800 m². |
-| TC_Update_Warehouse_007 | Update fails — warehouse not found | 1. Log in as System Admin.<br>2. `PATCH /api/warehouses/00000000-0000-4000-8000-000000000099` with valid body. | • HTTP `404 Not Found`.<br>• Message: **"Warehouse not found"**. | • Invalid `warehouseId`. |
-| TC_Update_Warehouse_008 | Update fails — empty PATCH body | 1. Log in as System Admin.<br>2. `PATCH /api/warehouses/{id}` with `{}`. | • HTTP `400 Bad Request`.<br>• Message: **"No valid fields to update"**. | • Valid warehouse exists. |
+| TC_Update_Warehouse_001 | Update warehouse information successfully | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập trang **Quản lý kho** (`/admin/warehouse`).<br>3. Chọn nút **Chỉnh sửa** (icon edit) trên một kho trong danh sách.<br>4. Trong popup **Chỉnh sửa kho**, sửa **Tên kho**, **Địa chỉ**, **Tỉnh/Thành phố**, **Quận/Huyện**.<br>5. Bấm **Cập nhật**. | • Thông báo: **"Cập nhật thành công."**<br>• Dữ liệu mới hiển thị sau khi tải lại trang.<br>• **Mã kho** không đổi. | • Kho đích đã tồn tại. |
+| TC_Update_Warehouse_002 | Update warehouse status and area fields | 1. Đăng nhập System Admin.<br>2. Chọn **Chỉnh sửa** trên một kho.<br>3. Đổi **Trạng thái** sang **Bảo trì** (`MAINTENANCE`).<br>4. Nhập **Tổng diện tích** = 5000, **Diện tích sử dụng** = 4500 (m²).<br>5. Bấm **Cập nhật**. | • Trạng thái và diện tích được lưu.<br>• API `PATCH /api/warehouses/{id}` trả về bản ghi đã cập nhật. | • Kho tồn tại.<br>• Tổng diện tích zone ≤ 4500 m² (nếu đã có zone). |
+| TC_Update_Warehouse_003 | Warehouse code is read-only on edit | 1. Đăng nhập System Admin.<br>2. Chọn **Chỉnh sửa** trên một kho.<br>3. Quan sát trường **Mã kho** trong popup **Chỉnh sửa kho**.<br>4. Sửa các trường khác, bấm **Cập nhật**. | • Trường **Mã kho** bị **disabled** (không sửa được).<br>• Sau khi lưu, **Mã kho** trên danh sách giữ nguyên. | • Kho có mã đã biết. |
+| TC_Update_Warehouse_004 | Update fails — empty warehouse name | 1. Đăng nhập System Admin.<br>2. Chọn **Chỉnh sửa** → xóa hết **Tên kho**.<br>3. Bấm **Cập nhật**. | • HTTP `400 Bad Request`.<br>• Thông báo: **"warehouseName cannot be empty"**.<br>• Dữ liệu kho không đổi. | • Kho tồn tại. |
+| TC_Update_Warehouse_005 | Update fails — usable area exceeds total area | 1. Đăng nhập System Admin.<br>2. Gọi API `PATCH /api/warehouses/{id}` với `{ "totalAreaM2": 1000, "usableAreaM2": 1500 }`. | • HTTP `400`, code `AREA_EXCEEDS_TOTAL`.<br>• Thông báo: diện tích sử dụng không được lớn hơn tổng diện tích.<br>• Không cập nhật. | • Kho tồn tại. |
+| TC_Update_Warehouse_006 | Update fails — usable area less than existing zone area | 1. Dùng kho có tổng diện tích zone = 800 m².<br>2. Gọi API `PATCH` với `{ "usableAreaM2": 500 }`. | • HTTP `400`, code `ZONE_AREA_EXCEEDS_USABLE`.<br>• Thông báo: tổng diện tích zone vượt diện tích sử dụng mới.<br>• `usableAreaM2` không giảm. | • Kho có zone tổng 800 m². |
+| TC_Update_Warehouse_007 | Update fails — warehouse not found | 1. Đăng nhập System Admin.<br>2. Gọi API `PATCH /api/warehouses/00000000-0000-4000-8000-000000000099`. | • HTTP `404 Not Found`.<br>• Thông báo: **"Warehouse not found"**. | • `warehouseId` không hợp lệ. |
+| TC_Update_Warehouse_008 | Update fails — empty PATCH body | 1. Đăng nhập System Admin.<br>2. Gọi API `PATCH /api/warehouses/{id}` với body `{}`. | • HTTP `400 Bad Request`.<br>• Thông báo: **"No valid fields to update"**. | • Kho hợp lệ tồn tại. |
 
 ---
 
@@ -1080,11 +1087,11 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_Delete_Warehouse_001 | Delete warehouse successfully | 1. Log in as System Admin.<br>2. Create a test warehouse with **no zones, contracts, or linked users**.<br>3. On `/admin/warehouse`, click **Delete**.<br>4. Confirm deletion. | • Success message: **"Warehouse deleted successfully."** (or *"Xóa thành công."*).<br>• Warehouse removed from list.<br>• `GET /api/warehouses/{id}` returns `404`. | • Test warehouse has no dependent records. |
-| TC_Delete_Warehouse_002 | Delete fails — warehouse has related data | 1. Log in as System Admin.<br>2. Attempt to delete a warehouse that has zones, contracts, or assigned WH Admin.<br>3. Confirm delete. | • HTTP `400 Bad Request`, code `FK_VIOLATION`.<br>• Message: related data still references this warehouse.<br>• Warehouse remains in list. | • Warehouse has child records (zones/contracts/users). |
-| TC_Delete_Warehouse_003 | Delete fails — warehouse not found | 1. Log in as System Admin.<br>2. `DELETE /api/warehouses/00000000-0000-4000-8000-000000000099`. | • HTTP `404 Not Found`.<br>• Message: **"Warehouse not found"**. | • Invalid `warehouseId`. |
-| TC_Delete_Warehouse_004 | WH Admin cannot delete warehouse | 1. Log in as Warehouse Admin.<br>2. Verify **Delete** button is hidden on `/admin/warehouse`.<br>3. Call `DELETE /api/warehouses/{warehouseId}` via API. | • UI: no delete icon for WH Admin.<br>• API: HTTP `403 Forbidden`.<br>• Message: **"SYSTEM_ADMIN only"**. | • WH Admin account is `ACTIVE`. |
-| TC_Delete_Warehouse_005 | WH Admin cannot delete warehouse via API | 1. Log in as WH Admin.<br>2. Attempt `DELETE` on any warehouse ID. | • HTTP `403 Forbidden`.<br>• Warehouse not deleted. | • WH Admin is `ACTIVE`. |
+| TC_Delete_Warehouse_001 | Delete warehouse successfully | 1. Đăng nhập System Admin.<br>2. Tạo kho test **không có** zone, hợp đồng, user gắn kho.<br>3. Trên **Quản lý kho**, chọn nút **Xóa** (icon thùng rác) trên kho test.<br>4. Xác nhận hộp thoại **"Bạn có chắc muốn xóa kho ...?"**. | • Thông báo: **"Xóa thành công"**.<br>• Kho biến mất khỏi danh sách.<br>• `GET /api/warehouses/{id}` trả về `404`. | • Kho test không có dữ liệu phụ thuộc. |
+| TC_Delete_Warehouse_002 | Delete fails — warehouse has related data | 1. Đăng nhập System Admin.<br>2. Chọn **Xóa** trên kho đã có zone / hợp đồng / WH Admin.<br>3. Xác nhận xóa. | • HTTP `400`, code `FK_VIOLATION`.<br>• Thông báo lỗi: còn dữ liệu liên quan.<br>• Kho vẫn còn trên danh sách. | • Kho có zone / contract / user. |
+| TC_Delete_Warehouse_003 | Delete fails — warehouse not found | 1. Đăng nhập System Admin.<br>2. Gọi API `DELETE /api/warehouses/00000000-0000-4000-8000-000000000099`. | • HTTP `404 Not Found`.<br>• Thông báo: **"Warehouse not found"**. | • `warehouseId` không hợp lệ. |
+| TC_Delete_Warehouse_004 | WH Admin cannot delete warehouse | 1. Đăng nhập WH Admin.<br>2. Truy cập **Quản lý kho** — kiểm tra không có nút **Xóa**.<br>3. Gọi API `DELETE /api/warehouses/{id}` qua Swagger. | • FE: không hiển thị icon xóa.<br>• API: HTTP `403 Forbidden` — **"SYSTEM_ADMIN only"**. | • WH Admin đang `ACTIVE`. |
+| TC_Delete_Warehouse_005 | WH Admin cannot delete warehouse via API | 1. Đăng nhập WH Admin.<br>2. Gọi `DELETE` bất kỳ `warehouseId`. | • HTTP `403 Forbidden`.<br>• Kho không bị xóa. | • WH Admin đang `ACTIVE`. |
 
 ---
 
@@ -1092,32 +1099,32 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_SYS_004 | Create Warehouse Admin account successfully | 1. Log in as System Admin.<br>2. Go to `/admin/accounts`.<br>3. Create user with role `WH_ADMIN` and select `warehouseId`.<br>4. Save. | • Success message: **"User created successfully."**<br>• New WH Admin can log in and access `/admin` routes for assigned warehouse. | • At least one warehouse exists. |
-| TC_SYS_005 | Create Tenant Admin account successfully | 1. Log in as System Admin.<br>2. Go to `/admin/accounts`.<br>3. Create user with role `TENANT_ADMIN` and select `tenantId`.<br>4. Save. | • Success message displayed.<br>• New Tenant Admin redirects to `/staff/products` after login. | • Tenant company record exists. |
-| TC_SYS_006 | WH Admin cannot create another WH Admin | 1. Log in as Warehouse Admin.<br>2. Attempt `POST /api/users` with role `WH_ADMIN`. | • HTTP `403 Forbidden`.<br>• User is not created. | • WH Admin account is `ACTIVE`. |
+| TC_SYS_004 | Create Warehouse Admin account successfully | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập **Quản lý tài khoản** (`/admin/accounts`).<br>3. Chọn **Thêm tài khoản** → role **Quản trị kho** → chọn kho.<br>4. Bấm **Tạo tài khoản**. | • Thông báo: **"Tạo tài khoản thành công."**<br>• WH Admin mới đăng nhập và truy cập `/admin` đúng kho. | • At least one warehouse exists. |
+| TC_SYS_005 | Create Tenant Admin account successfully | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập **Quản lý tài khoản** (`/admin/accounts`).<br>3. Chọn **Thêm tài khoản** → role **Quản trị tenant** → chọn tenant.<br>4. Bấm **Tạo tài khoản**. | • Thông báo tạo tài khoản thành công.<br>• Tenant Admin chuyển tới `/staff/products` sau đăng nhập. | • Tenant company record exists. |
+| TC_SYS_006 | WH Admin cannot create another WH Admin | 1. Đăng nhập bằng tài khoản Warehouse Admin.<br>2. Attempt `POST /api/users` with role `WH_ADMIN`. | • HTTP `403 Forbidden`.<br>• User is not created. | • WH Admin account is `ACTIVE`. |
 
 ## **Master Data** (#5)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_SYS_007 | View categories and seasons | 1. Log in as System Admin.<br>2. Call `GET /api/categories` and `GET /api/seasons` via Swagger. | • Both endpoints return HTTP `200`.<br>• Response contains at least one category and one season (seed data). | • Database seeded. |
-| TC_SYS_008 | Create category successfully | 1. Log in as System Admin.<br>2. `POST /api/categories` with valid `categoryCode` and `categoryName`. | • HTTP `201 Created`.<br>• Category appears in subsequent GET list. | • System Admin token valid. |
+| TC_SYS_007 | View categories and seasons | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Call `GET /api/categories` and `GET /api/seasons` via Swagger. | • Both endpoints return HTTP `200`.<br>• Response contains at least one category and one season (seed data). | • Database seeded. |
+| TC_SYS_008 | Create category successfully | 1. Đăng nhập bằng tài khoản System Admin.<br>2. `POST /api/categories` with valid `categoryCode` and `categoryName`. | • HTTP `201 Created`.<br>• Category appears in subsequent GET list. | • System Admin token valid. |
 
 ## **Rental Request** (#6, #7)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_SYS_009 | Approve rental request successfully | 1. Ensure a rental request exists with status `PENDING`.<br>2. Log in as System Admin.<br>3. Open `/admin/requests`.<br>4. Approve the request. | • Status changes to `APPROVED`.<br>• Success message displayed.<br>• Request is ready for contract creation. | • Pending rental request exists. |
-| TC_SYS_010 | Reject rental request successfully | 1. Open a `PENDING` rental request.<br>2. Reject with reason. | • Status changes to `REJECTED`.<br>• Rejection reason is saved. | • Pending rental request exists. |
+| TC_SYS_009 | Approve rental request successfully | 1. Có sẵn yêu cầu thuê trạng thái `PENDING`.<br>2. Đăng nhập System Admin.<br>3. Truy cập **Quản lý yêu cầu thuê** (`/admin/requests`).<br>4. Mở chi tiết yêu cầu → chọn **Duyệt & tiếp** (wizard onboarding). | • Trạng thái → `APPROVED`.<br>• Thông báo thành công.<br>• Yêu cầu sẵn sàng tạo hợp đồng. | • Pending rental request exists. |
+| TC_SYS_010 | Reject rental request successfully | 1. Mở chi tiết yêu cầu thuê trạng thái `PENDING`.<br>2. Chọn **Từ chối** và nhập lý do. | • Status changes to `REJECTED`.<br>• Rejection reason is saved. | • Pending rental request exists. |
 
 ## **View All Data** (#8–#11)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_SYS_011 | View all tenants | 1. Log in as System Admin.<br>2. Call `GET /api/tenant-companies`. | • HTTP `200`.<br>• List includes all tenant companies in system. | • At least one tenant exists. |
-| TC_SYS_012 | View all contracts | 1. Log in as System Admin.<br>2. Navigate to `/admin/contract`. | • Contract list loads for all tenants/warehouses.<br>• Filters work by status. | • At least one contract exists. |
-| TC_SYS_013 | View all reports | 1. Log in as System Admin.<br>2. Navigate to `/admin/reports`. | • Reports page loads without error.<br>• User can select report type and date range. | • System Admin account is `ACTIVE`. |
-| TC_SYS_014 | View all invoices (API pending) | 1. Log in as System Admin.<br>2. Attempt invoice list via API/UI. | • Document as **Not yet implemented** — verify via DB table `invoices` if needed for demo. | • Billing module not exposed yet. |
+| TC_SYS_011 | View all tenants | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Call `GET /api/tenant-companies`. | • HTTP `200`.<br>• List includes all tenant companies in system. | • At least one tenant exists. |
+| TC_SYS_012 | View all contracts | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập trang `/admin/contract`. | • Contract list loads for all tenants/warehouses.<br>• Filters work by status. | • At least one contract exists. |
+| TC_SYS_013 | View all reports | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Truy cập trang `/admin/reports`. | • Reports page loads without error.<br>• User can select report type and date range. | • System Admin account is `ACTIVE`. |
+| TC_SYS_014 | View all invoices (API pending) | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Attempt invoice list via API/UI. | • Document as **Not yet implemented** — verify via DB table `invoices` if needed for demo. | • Billing module not exposed yet. |
 
 ---
 
@@ -1129,28 +1136,28 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHAD_001 | Create warehouse zone successfully | 1. Log in as WH Admin.<br>2. Go to `/admin/zones`.<br>3. Create zone with `zoneCode`, `zoneName`, `zoneType`.<br>4. Save. | • Zone created under assigned warehouse.<br>• Appears in zone list. | • WH Admin linked to warehouse. |
-| TC_WHAD_002 | Create rack successfully | 1. Select a zone.<br>2. Go to `/admin/racks`.<br>3. Create rack with `rackCode`, `rackName`. | • Rack created and linked to zone. | • Zone exists in WH Admin's warehouse. |
-| TC_WHAD_003 | Create rack level successfully | 1. Select a rack.<br>2. Create rack level with `levelNumber`, `levelCode`. | • Rack level created under rack. | • Rack exists. |
-| TC_WHAD_004 | Create bin successfully | 1. Select rack level.<br>2. Create bin with `binCode`, `boxType`, `volumeUnits`. | • Bin created with status `AVAILABLE`. | • Rack level exists. |
-| TC_WHAD_005 | Update warehouse structure successfully | 1. PATCH an existing zone/rack/bin name or status.<br>2. Refresh list. | • Changes persisted.<br>• Success message shown. | • Structure entity exists. |
-| TC_WHAD_006 | WH Staff cannot create zone | 1. Log in as WH Staff.<br>2. Attempt `POST /api/zones`. | • HTTP `403 Forbidden`. | • WH Staff account is `ACTIVE`. |
+| TC_WHAD_001 | Create warehouse zone successfully | 1. Đăng nhập WH Admin.<br>2. Truy cập **Quản lý zone** (`/admin/zones`).<br>3. Chọn **TẠO ZONE** → nhập **Mã zone**, **Tên zone**, **Loại zone**.<br>4. Bấm **Tạo zone**. | • Thông báo: **"Tạo zone thành công"**.<br>• Zone hiển thị trong danh sách kho được gán. | • WH Admin linked to warehouse. |
+| TC_WHAD_002 | Create rack successfully | 1. Chọn một zone trong danh sách.<br>2. Truy cập **Quản lý rack** (`/admin/racks`).<br>3. Chọn **Thêm rack** → nhập **Mã rack**, **Tên rack**.<br>4. Bấm **Lưu**. | • Rack được tạo và liên kết với zone. | • Zone exists in WH Admin's warehouse. |
+| TC_WHAD_003 | Create rack level successfully | 1. Chọn một rack.<br>2. Tạo tầng rack với **Số tầng**, **Mã tầng** (trong flow rack layout). | • Tầng rack được tạo dưới rack đã chọn. | • Rack exists. |
+| TC_WHAD_004 | Create bin successfully | 1. Chọn tầng rack.<br>2. Chọn **Tạo bin** hoặc **Tạo bin hàng loạt** → nhập **Mã bin**, loại thùng, dung tích.<br>3. Bấm **Tạo bin**. | • Bin được tạo, trạng thái `AVAILABLE`. | • Rack level exists. |
+| TC_WHAD_005 | Update warehouse structure successfully | 1. Chọn **Chỉnh sửa** trên zone/rack/bin.<br>2. Sửa tên hoặc trạng thái → bấm **Cập nhật** / **Lưu**.<br>3. Tải lại danh sách. | • Thay đổi được lưu.<br>• Thông báo thành công. | • Structure entity exists. |
+| TC_WHAD_006 | WH Staff cannot create zone | 1. Đăng nhập bằng tài khoản WH Staff.<br>2. Attempt `POST /api/zones`. | • HTTP `403 Forbidden`. | • WH Staff account is `ACTIVE`. |
 
 ## **Account Management** (#17, #18)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHAD_007 | Create Warehouse Staff account | 1. Log in as WH Admin.<br>2. `/admin/accounts` → role `WH_STAFF`.<br>3. Save without warehouseId. | • User created with same `warehouseId` as WH Admin.<br>• Staff can log in → `/staff/inbound-ops`. | • WH Admin is `ACTIVE`. |
-| TC_WHAD_008 | Create Transporter account | 1. WH Admin creates user with role `WH_TRANSPORTER`. | • Transporter created in same warehouse.<br>• Login redirects to `/staff/my-deliveries`. | • WH Admin is `ACTIVE`. |
+| TC_WHAD_007 | Create Warehouse Staff account | 1. Đăng nhập WH Admin.<br>2. Truy cập **Quản lý tài khoản** (`/admin/accounts`).<br>3. Chọn **Thêm tài khoản** → role **Nhân viên kho** (`WH_STAFF`).<br>4. Bấm **Tạo tài khoản** (không cần chọn kho — tự gán). | • Thông báo tạo tài khoản thành công.<br>• Staff đăng nhập → chuyển tới `/staff/inbound-ops`. | • WH Admin is `ACTIVE`. |
+| TC_WHAD_008 | Create Transporter account | 1. Đăng nhập WH Admin.<br>2. **Quản lý tài khoản** → **Thêm tài khoản** → role **Tài xế kho** (`WH_TRANSPORTER`).<br>3. Bấm **Tạo tài khoản**. | • Tài xế được tạo cùng kho.<br>• Đăng nhập → chuyển tới **Chuyến vận chuyển của tôi** (`/staff/my-deliveries`). | • WH Admin is `ACTIVE`. |
 
 ## **Rental Request & Contract** (#19–#21, #30–#31)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHAD_009 | Review rental request | 1. Open `/admin/requests`.<br>2. Set status to `UNDER_REVIEW`. | • Status updated.<br>• Review notes saved if provided. | • Pending rental request exists. |
-| TC_WHAD_010 | Approve rental request | 1. Approve a reviewed request. | • Status = `APPROVED`. | • Request in reviewable state. |
-| TC_WHAD_011 | Reject rental request | 1. Reject with reason. | • Status = `REJECTED`. | • Pending request exists. |
-| TC_WHAD_012 | Create contract successfully | 1. Go to `/admin/contract`.<br>2. Create contract from approved rental request.<br>3. Fill dates and contract type. | • Contract created with status `DRAFT` or `ACTIVE`.<br>• Linked to tenant and warehouse. | • Approved rental request exists. |
+| TC_WHAD_009 | Review rental request | 1. Truy cập **Quản lý yêu cầu thuê** (`/admin/requests`).<br>2. Mở chi tiết yêu cầu → chuyển trạng thái sang **Đang xem xét** (`UNDER_REVIEW`). | • Trạng thái được cập nhật.<br>• Ghi chú xem xét được lưu (nếu có). | • Pending rental request exists. |
+| TC_WHAD_010 | Approve rental request | 1. Mở yêu cầu đã xem xét.<br>2. Chọn **Duyệt & tiếp** trong wizard onboarding. | • Trạng thái = `APPROVED`. | • Request in reviewable state. |
+| TC_WHAD_011 | Reject rental request | 1. Mở chi tiết yêu cầu thuê.<br>2. Chọn **Từ chối** và nhập lý do. | • Trạng thái = `REJECTED`. | • Pending request exists. |
+| TC_WHAD_012 | Create contract successfully | 1. Truy cập **Quản lý hợp đồng** (`/admin/contract`).<br>2. Trong wizard onboarding, bước **Tạo hợp đồng** từ yêu cầu đã duyệt.<br>3. Nhập ngày bắt đầu/kết thúc, loại hợp đồng. | • Hợp đồng được tạo, trạng thái `DRAFT` hoặc `ACTIVE`.<br>• Liên kết tenant và kho. | • Approved rental request exists. |
 | TC_WHAD_013 | Activate contract | 1. PATCH contract status to `ACTIVE`. | • Tenant can create inbound/outbound.<br>• Success message shown. | • Contract in `DRAFT`. |
 
 ## **Storage Reservation** (#32)
@@ -1164,10 +1171,10 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHAD_016 | View inbound request list | 1. Navigate to `/admin/inbound`.<br>2. Filter by `PENDING`. | • List shows inbound for WH Admin's warehouse only. | • Pending inbound exists. |
-| TC_WHAD_017 | Approve inbound request | 1. Open inbound detail.<br>2. Click **Approve**. | • Status → `APPROVED`.<br>• Tenant notified (if email enabled). | • Inbound `PENDING`, contract `ACTIVE`. |
-| TC_WHAD_018 | Reject inbound request | 1. Reject pending inbound. | • Status → `CANCELLED`. | • Inbound `PENDING`. |
-| TC_WHAD_019 | Assign transporter to inbound trip | 1. Open WAREHOUSE_TRANSPORT inbound.<br>2. Select transporter in delivery section.<br>3. Save. | • `assignedDriverUserId` saved.<br>• Transporter sees trip in my-deliveries. | • Transporter account exists.<br>• Inbound approved. |
+| TC_WHAD_016 | View inbound request list | 1. Truy cập **Quản lý inbound** (`/admin/inbound`).<br>2. Lọc trạng thái `PENDING`. | • Danh sách inbound thuộc kho của WH Admin.<br>• Chỉ hiển thị inbound trong phạm vi kho. | • Pending inbound exists. |
+| TC_WHAD_017 | Approve inbound request | 1. Mở chi tiết yêu cầu nhập kho (`/admin/inbound/{id}`).<br>2. Bấm **Duyệt** và xác nhận hộp thoại. | • Status → `APPROVED`.<br>• Tenant notified (if email enabled). | • Inbound `PENDING`, contract `ACTIVE`. |
+| TC_WHAD_018 | Reject inbound request | 1. Mở chi tiết inbound → chọn **Hủy** / từ chối. | • Status → `CANCELLED`. | • Inbound `PENDING`. |
+| TC_WHAD_019 | Assign transporter to inbound trip | 1. Mở chi tiết inbound loại **Kho đi lấy hàng** (`WAREHOUSE_TRANSPORT`).<br>2. Ở mục vận chuyển, chọn tài xế trong dropdown.<br>3. Bấm **Lưu vận chuyển**. | • `assignedDriverUserId` saved.<br>• Tài xế thấy chuyến tại **Chuyến vận chuyển của tôi** (`/staff/my-deliveries`). | • Transporter account exists.<br>• Inbound approved. |
 | TC_WHAD_020 | View outbound request list | 1. `GET /api/outbound-requests?warehouseId=` via Swagger. | • HTTP `200` with outbound list scoped to warehouse. | • Outbound request exists. |
 | TC_WHAD_021 | Approve outbound request | 1. PATCH outbound status to `APPROVED`. | • Status → `APPROVED` then system reserves inventory (`RESERVED`). | • Sufficient inventory available. |
 | TC_WHAD_022 | Reject outbound request | 1. PATCH outbound to `CANCELLED`. | • Outbound cancelled.<br>• No inventory locked. | • Outbound in `PENDING`. |
@@ -1176,10 +1183,10 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHAD_023 | View warehouse inventory | 1. Navigate to `/admin/inventory`. | • Inventory list scoped to WH Admin warehouse.<br>• SKU, bin, quantity visible. | • Inventory records exist. |
-| TC_WHAD_024 | View tenant company info | 1. Open rental request or contract detail.<br>2. View linked tenant info. | • Tenant name, tax code, contact displayed. | • Tenant linked to contract/request. |
-| TC_WHAD_025 | View occupancy dashboard | 1. Open `/admin/dashboard`. | • Occupancy widgets load (or placeholder if API pending). | • Bins with usage data exist. |
-| TC_WHAD_026 | View warehouse reports | 1. Open `/admin/reports`. | • Reports page accessible for WH Admin. | • WH Admin is `ACTIVE`. |
+| TC_WHAD_023 | View warehouse inventory | 1. Truy cập trang `/admin/inventory`. | • Inventory list scoped to WH Admin warehouse.<br>• SKU, bin, quantity visible. | • Inventory records exist. |
+| TC_WHAD_024 | View tenant company info | 1. Mở chi tiết yêu cầu thuê hoặc hợp đồng.<br>2. Xem thông tin tenant liên kết. | • Tenant name, tax code, contact displayed. | • Tenant linked to contract/request. |
+| TC_WHAD_025 | View occupancy dashboard | 1. Mở trang `/admin/dashboard`. | • Occupancy widgets load (or placeholder if API pending). | • Bins with usage data exist. |
+| TC_WHAD_026 | View warehouse reports | 1. Mở trang `/admin/reports`. | • Reports page accessible for WH Admin. | • WH Admin is `ACTIVE`. |
 | TC_WHAD_027 | View and send invoice (API pending) | 1. Attempt invoice list/send. | • Document as **Not yet implemented** until billing API available. | • Invoice module pending. |
 
 ---
@@ -1192,27 +1199,27 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_TAD_001 | Create Tenant Staff account | 1. Log in as Tenant Admin.<br>2. `/staff/accounts` → role `TENANT_STAFF`.<br>3. Save. | • Staff created with same `tenantId`.<br>• Staff can log in to `/staff/dashboard`. | • Tenant Admin is `ACTIVE`. |
-| TC_TAD_002 | Tenant Staff cannot access account management | 1. Log in as Tenant Staff.<br>2. Navigate to `/staff/accounts`. | • Access denied or redirect.<br>• HTTP `403` on account create API. | • Tenant Staff account exists. |
-| TC_TAD_003 | View contract successfully | 1. Log in as Tenant Admin.<br>2. Open `/staff/contracts`.<br>3. Click contract detail. | • Active contract details shown.<br>• Contract type, dates, warehouse visible. | • Active contract for tenant. |
-| TC_TAD_004 | Create new rental request | 1. Open `/staff/rental-requests` or landing `/`.<br>2. Submit new rental inquiry with volume and contract type. | • Rental request created with status `PENDING`.<br>• Success confirmation shown. | • Tenant Admin is `ACTIVE`. |
+| TC_TAD_001 | Create Tenant Staff account | 1. Đăng nhập Tenant Admin.<br>2. Truy cập **Quản lý tài khoản** (`/staff/accounts`).<br>3. Chọn **Thêm tài khoản** → role **Nhân viên tenant** (`TENANT_STAFF`).<br>4. Bấm **Tạo tài khoản**. | • Staff được tạo cùng `tenantId`.<br>• Staff đăng nhập → `/staff/dashboard`. | • Tenant Admin is `ACTIVE`. |
+| TC_TAD_002 | Tenant Staff cannot access account management | 1. Đăng nhập bằng tài khoản Tenant Staff.<br>2. Truy cập trang `/staff/accounts`. | • Access denied or redirect.<br>• HTTP `403` on account create API. | • Tenant Staff account exists. |
+| TC_TAD_003 | View contract successfully | 1. Đăng nhập Tenant Admin.<br>2. Truy cập **Hợp đồng** (`/staff/contracts`).<br>3. Chọn một hợp đồng để xem chi tiết. | • Chi tiết hợp đồng đang hoạt động hiển thị.<br>• Loại HĐ, ngày, kho hiển thị đúng. | • Active contract for tenant. |
+| TC_TAD_004 | Create new rental request | 1. Truy cập **Yêu cầu thuê kho** (`/staff/rental-requests`) hoặc trang landing `/`.<br>2. Điền form **Tạo yêu cầu thuê mới** (dung lượng, loại hợp đồng).<br>3. Bấm **Tạo yêu cầu**. | • Yêu cầu thuê được tạo, trạng thái `PENDING`.<br>• Thông báo xác nhận thành công. | • Tenant Admin is `ACTIVE`. |
 
 ## **SKU Management** (#40–#42)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_TAD_005 | Create SKU successfully | 1. `/staff/products` → **Add SKU**.<br>2. Enter `skuCode`, name, category, season.<br>3. Save. | • SKU created.<br>• Appears in product list.<br>• `skuCode` unique within tenant. | • Categories/seasons seeded.<br>• Contract active. |
-| TC_TAD_006 | Create SKU fails with duplicate code | 1. Create SKU with existing `skuCode` in same tenant. | • HTTP `409` or validation error.<br>• **"SKU code already exists in this tenant."** | • Duplicate skuCode exists. |
-| TC_TAD_007 | Update SKU successfully | 1. Edit existing SKU name or movement category.<br>2. Save. | • Changes persisted. | • SKU exists, no delete constraint. |
-| TC_TAD_008 | Delete SKU successfully (soft disable) | 1. Delete/disable SKU with zero inventory. | • SKU `isActive = false`.<br>• Removed from active list. | • SKU has no inventory. |
-| TC_TAD_009 | Delete SKU blocked when inventory exists | 1. Attempt delete on SKU with stock. | • HTTP `400`.<br>• **"Cannot delete SKU with existing inventory."** | • SKU has inventory > 0. |
+| TC_TAD_005 | Create SKU successfully | 1. Truy cập **Quản lý SKU** (`/staff/products`).<br>2. Chọn **THÊM SKU** → nhập **Mã SKU**, tên, danh mục, mùa.<br>3. Bấm **Lưu**. | • Thông báo: **"Đã thêm SKU"**.<br>• SKU hiển thị trong danh sách.<br>• `skuCode` duy nhất trong tenant. | • Categories/seasons seeded.<br>• Contract active. |
+| TC_TAD_006 | Create SKU fails with duplicate code | 1. Chọn **THÊM SKU** và nhập **Mã SKU** đã tồn tại trong cùng tenant. | • HTTP `409` hoặc lỗi validation.<br>• **"SKU code already exists in this tenant."** | • Duplicate skuCode exists. |
+| TC_TAD_007 | Update SKU successfully | 1. Chọn **Sửa SKU** trên một SKU có sẵn.<br>2. Sửa tên hoặc danh mục vận chuyển → bấm **Lưu**. | • Thông báo: **"Đã cập nhật SKU"**.<br>• Thay đổi được lưu. | • SKU exists, no delete constraint. |
+| TC_TAD_008 | Delete SKU successfully (soft disable) | 1. Chọn **Xóa** trên SKU không còn tồn kho. | • SKU `isActive = false`.<br>• Biến mất khỏi danh sách đang hoạt động. | • SKU has no inventory. |
+| TC_TAD_009 | Delete SKU blocked when inventory exists | 1. Thử **Xóa** SKU còn tồn kho. | • HTTP `400`.<br>• **"Cannot delete SKU with existing inventory."** | • SKU has inventory > 0. |
 
 ## **Inbound & Outbound** (#43–#44)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_TAD_010 | Create inbound request successfully | 1. `/staff/inbound/new`.<br>2. Select active contract, SKUs, quantities.<br>3. Submit. | • Inbound status = `PENDING`.<br>• Items saved correctly. | • Active contract.<br>• SKUs exist. |
-| TC_TAD_011 | Create inbound fails without active contract | 1. Attempt inbound with expired/no contract. | • HTTP `400`.<br>• **"Contract must be ACTIVE."** | • No active contract. |
+| TC_TAD_010 | Create inbound request successfully | 1. Truy cập **Tạo yêu cầu nhập kho** (`/staff/inbound/new`).<br>2. Chọn hợp đồng đang hoạt động, SKU và số lượng.<br>3. Bấm gửi / tạo yêu cầu. | • Inbound trạng thái = `PENDING`.<br>• Các dòng SKU được lưu đúng. | • Active contract.<br>• SKUs exist. |
+| TC_TAD_011 | Create inbound fails without active contract | 1. Thử tạo inbound khi không có hợp đồng ACTIVE. | • HTTP `400`.<br>• **"Contract must be ACTIVE."** | • No active contract. |
 | TC_TAD_012 | Create outbound request successfully | 1. `POST /api/outbound-requests` with valid items (Swagger). | • Outbound status = `PENDING`. | • Active contract.<br>• Sufficient inventory. |
 | TC_TAD_013 | Create outbound fails — insufficient inventory | 1. Request quantity > available stock. | • HTTP `400`.<br>• **"INSUFFICIENT_INVENTORY"**. | • Low or zero stock for SKU. |
 
@@ -1222,7 +1229,7 @@ POST /api/inbound-requests/{id}/report-arrival
 |--------------|----------------------|---------------------|------------------|----------------|
 | TC_TAD_014 | View tenant inventory | 1. `/staff/inventory`. | • Shows only current tenant's stock.<br>• Cannot see other tenant data. | • Inventory exists for tenant. |
 | TC_TAD_015 | View invoice (API pending) | 1. Attempt invoice view. | • **Not yet implemented** — document for future sprint. | • Billing API pending. |
-| TC_TAD_016 | View tenant reports | 1. Open dashboard or reports (if available). | • Tenant-scoped summary visible. | • Tenant Admin is `ACTIVE`. |
+| TC_TAD_016 | View tenant reports | 1. Mở trang dashboard or reports (if available). | • Tenant-scoped summary visible. | • Tenant Admin is `ACTIVE`. |
 | TC_TAD_017 | Tenant Admin cannot approve own inbound | 1. PATCH inbound to `APPROVED` as Tenant Admin. | • HTTP `403 Forbidden`. | • Pending inbound exists. |
 
 ---
@@ -1235,19 +1242,19 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHST_001 | Mark inbound arrived (tenant self-delivery) | 1. Log in as WH Staff.<br>2. Open `/staff/inbound-ops/{id}` for `TENANT_SELF` inbound (`APPROVED`).<br>3. Save delivery plate → mark **ARRIVED**. | • Status → `ARRIVED`.<br>• `actualArrivalAt` recorded. | • Inbound approved.<br>• Delivery info saved. |
-| TC_WHST_002 | Start receiving and record quantity | 1. Click **Start receiving**.<br>2. Enter `receivedQuantity` per SKU line.<br>3. Save. | • Status → `RECEIVING`.<br>• Quantities saved.<br>• Discrepancy flagged if mismatch. | • Inbound `ARRIVED` or `APPROVED`. |
-| TC_WHST_003 | Create batch successfully | 1. Enter batch code.<br>2. Create batch for inbound. | • Batch linked to inbound.<br>• `warehouseReceivedAt` set. | • Inbound in receiving state. |
-| TC_WHST_004 | Create LPN and add SKU details | 1. Create LPN with box type.<br>2. Add SKU quantities via lpn-details. | • LPN code generated.<br>• LPN status `RECEIVING`. | • Batch exists. |
-| TC_WHST_005 | Put-away LPN to bin successfully | 1. Select LPN.<br>2. Assign target bin.<br>3. Confirm put-away. | • LPN `currentBinId` updated.<br>• LPN status → `STORED`.<br>• Inventory increased.<br>• Bin volume updated. | • LPN created.<br>• Available bin exists. |
-| TC_WHST_006 | Complete inbound after all put-away | 1. Put-away all LPNs.<br>2. Complete inbound. | • Inbound status → `COMPLETED`. | • All LPNs stored. |
+| TC_WHST_001 | Mark inbound arrived (tenant self-delivery) | 1. Đăng nhập WH Staff.<br>2. Mở chi tiết inbound (`/staff/inbound-ops/{id}`) loại **Tự giao** (`TENANT_SELF`), trạng thái `APPROVED`.<br>3. Nhập biển số xe → bấm **Báo đã đến kho**. | • Trạng thái → `ARRIVED`.<br>• `actualArrivalAt` được ghi nhận. | • Inbound approved.<br>• Delivery info saved. |
+| TC_WHST_002 | Start receiving and record quantity | 1. Bấm **Bắt đầu nhận hàng**.<br>2. Nhập **Số lượng thực nhận** từng dòng SKU.<br>3. Bấm **Hoàn tất kiểm đếm**. | • Trạng thái → `RECEIVING`.<br>• Số lượng được lưu.<br>• Chênh lệch được đánh dấu nếu không khớp. | • Inbound `ARRIVED` or `APPROVED`. |
+| TC_WHST_003 | Create batch successfully | 1. Nhập **Mã batch**.<br>2. Bấm tạo batch cho inbound đang nhận. | • Batch liên kết inbound.<br>• `warehouseReceivedAt` được ghi. | • Inbound in receiving state. |
+| TC_WHST_004 | Create LPN and add SKU details | 1. Tạo LPN với loại thùng.<br>2. Thêm SKU và số lượng vào LPN. | • Mã LPN được sinh.<br>• LPN trạng thái `RECEIVING`. | • Batch exists. |
+| TC_WHST_005 | Put-away LPN to bin successfully | 1. Chọn LPN cần cất.<br>2. Chọn bin đích trong phần **Putaway**.<br>3. Bấm **Putaway 1 LPN (thủ công)** hoặc **Putaway tự động**. | • LPN `currentBinId` cập nhật.<br>• LPN trạng thái → `STORED`.<br>• Tồn kho tăng.<br>• Dung tích bin cập nhật. | • LPN created.<br>• Available bin exists. |
+| TC_WHST_006 | Complete inbound after all put-away | 1. Putaway tất cả LPN.<br>2. Bấm **Hoàn tất inbound**. | • Inbound trạng thái → `COMPLETED`. | • All LPNs stored. |
 
 ## **Outbound Operations** (#52–#53)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHST_007 | Execute outbound picking | 1. Open outbound in `RESERVED`/`PICKING`.<br>2. Confirm pick quantities per task (API/UI). | • Status → `PICKING`.<br>• Picked qty recorded. | • Outbound approved and reserved. |
-| TC_WHST_008 | Pack and create shipment | 1. Mark outbound `PACKING` then `SHIPPED`.<br>2. Enter tracking number. | • Status → `SHIPPED`.<br>• Shipment record created. | • Picking completed. |
+| TC_WHST_007 | Execute outbound picking | 1. Mở chi tiết outbound ở trạng thái `RESERVED`/`PICKING`.<br>2. Xác nhận số lượng pick theo từng task (API/UI). | • Trạng thái → `PICKING`.<br>• Số lượng đã pick được ghi nhận. | • Outbound approved and reserved. |
+| TC_WHST_008 | Pack and create shipment | 1. Chuyển outbound sang `PACKING` rồi `SHIPPED`.<br>2. Nhập mã vận đơn (tracking). | • Trạng thái → `SHIPPED`.<br>• Bản ghi shipment được tạo. | • Picking completed. |
 
 ## **Inventory & Damage** (#54–#55)
 
@@ -1268,17 +1275,17 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_TST_001 | Create inbound request successfully | 1. Log in as Tenant Staff.<br>2. `/staff/inbound/new` → submit. | • Same result as TC_TAD_010.<br>• Status `PENDING`. | • Active contract.<br>• SKUs exist. |
+| TC_TST_001 | Create inbound request successfully | 1. Đăng nhập Tenant Staff.<br>2. Truy cập **Tạo yêu cầu nhập kho** (`/staff/inbound/new`) → gửi form. | • Giống TC_TAD_010.<br>• Trạng thái `PENDING`. | • Active contract.<br>• SKUs exist. |
 | TC_TST_002 | Create outbound request (API) | 1. Tenant Staff calls `POST /api/outbound-requests`. | • Outbound created if inventory sufficient. | • Same as TC_TAD_012. |
-| TC_TST_003 | View inbound and outbound status | 1. `/staff/inbound` → open detail → check timeline.<br>2. List outbounds via API. | • Status timeline visible.<br>• Read-only — no approve buttons. | • Requests exist for tenant. |
-| TC_TST_004 | Tenant Staff cannot access account page | 1. Navigate to `/staff/accounts`. | • Access denied. | • Tenant Staff is `ACTIVE`. |
+| TC_TST_003 | View inbound and outbound status | 1. Truy cập **Nhập kho** (`/staff/inbound`) → mở chi tiết → xem timeline.<br>2. Xem danh sách outbound qua API. | • Timeline trạng thái hiển thị.<br>• Chỉ xem — không có nút duyệt. | • Requests exist for tenant. |
+| TC_TST_004 | Tenant Staff cannot access account page | 1. Truy cập trang `/staff/accounts`. | • Access denied. | • Tenant Staff is `ACTIVE`. |
 
 ## **SKU Management** (#59–#60)
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_TST_005 | Create SKU successfully | 1. `/staff/products` → add SKU. | • SKU created under tenant (same as TC_TAD_005). | • Categories seeded. |
-| TC_TST_006 | Update SKU successfully | 1. Edit SKU on products page. | • Update persisted. | • SKU exists. |
+| TC_TST_005 | Create SKU successfully | 1. Truy cập **Quản lý SKU** (`/staff/products`) → chọn **THÊM SKU**. | • SKU được tạo (giống TC_TAD_005). | • Categories seeded. |
+| TC_TST_006 | Update SKU successfully | 1. Chọn **Sửa SKU** trên trang sản phẩm → bấm **Lưu**. | • Cập nhật được lưu. | • SKU exists. |
 | TC_TST_007 | Tenant Staff cannot delete SKU | 1. Attempt `DELETE /api/skus/{id}` as Tenant Staff. | • HTTP `403 Forbidden` (if restricted) OR UI hides delete — per product policy.<br>• SKU remains active. | • SKU exists.<br>• *Note: align with BE policy — Tenant Staff typically has no delete.* |
 
 ## **View Data** (#61–#62)
@@ -1288,7 +1295,7 @@ POST /api/inbound-requests/{id}/report-arrival
 | TC_TST_008 | View tenant inventory | 1. `/staff/inventory`. | • Tenant-scoped inventory only. | • Inventory exists. |
 | TC_TST_009 | View invoice (API pending) | 1. Attempt invoice view. | • **Not yet implemented**. | • Billing pending. |
 | TC_TST_010 | Tenant Staff cannot create rental request | 1. `POST /api/rental-requests` as Tenant Staff. | • HTTP `403` or UI not available for this role. | • Tenant Staff is `ACTIVE`. |
-| TC_TST_011 | Tenant Staff cannot manage warehouse inbound ops | 1. Navigate to `/staff/inbound-ops`. | • No receive/put-away actions or access denied for warehouse ops mode. | • Tenant Staff is `ACTIVE`. |
+| TC_TST_011 | Tenant Staff cannot manage warehouse inbound ops | 1. Truy cập trang `/staff/inbound-ops`. | • No receive/put-away actions or access denied for warehouse ops mode. | • Tenant Staff is `ACTIVE`. |
 
 ---
 
@@ -1312,10 +1319,10 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHTR_001 | View assigned delivery trips successfully | 1. Log in as Warehouse Transporter.<br>2. System redirects to `/staff/my-deliveries`.<br>3. Observe the trip list. | • Page title shows **My Delivery Trips** (or equivalent).<br>• System displays only inbound requests assigned to the logged-in transporter.<br>• Each row shows inbound code, expected arrival date, and current status. | • Transporter account exists and is `ACTIVE`.<br>• At least one inbound with `deliveryMode = WAREHOUSE_TRANSPORT` is assigned to this transporter.<br>• Inbound status is `APPROVED` or later. |
-| TC_WHTR_002 | Empty state when no trips are assigned | 1. Log in as a newly created Transporter with no assigned trips.<br>2. Open `/staff/my-deliveries`. | • System shows empty state message: **"No trips assigned yet."** (or equivalent).<br>• No inbound rows are displayed. | • Transporter account exists and is `ACTIVE`.<br>• No inbound delivery record has `assignedDriverUserId` = this user. |
-| TC_WHTR_003 | Non-transporter cannot use assigned-to-me filter | 1. Log in as Warehouse Staff.<br>2. Call API `GET /api/inbound-requests?assignedToMe=true` (via Swagger or network tab). | • System returns HTTP `403 Forbidden`.<br>• Error message: **"assignedToMe requires WH_TRANSPORTER"**. | • WH Staff account exists and is `ACTIVE`. |
-| TC_WHTR_004 | Transporter cannot see unassigned warehouse-transport trips | 1. Log in as Warehouse Transporter A.<br>2. WH Admin assigns a WAREHOUSE_TRANSPORT inbound to Transporter B only.<br>3. Transporter A opens `/staff/my-deliveries`. | • Inbound assigned to Transporter B does **not** appear in Transporter A's list. | • Two transporter accounts exist in the same warehouse.<br>• One inbound is assigned only to Transporter B. |
+| TC_WHTR_001 | View assigned delivery trips successfully | 1. Đăng nhập Tài xế kho.<br>2. Hệ thống chuyển tới **Chuyến vận chuyển của tôi** (`/staff/my-deliveries`).<br>3. Quan sát danh sách chuyến. | • Tiêu đề trang: **Chuyến vận chuyển của tôi**.<br>• Chỉ hiển thị inbound được gán cho tài xế đang đăng nhập.<br>• Mỗi dòng có mã inbound, ngày dự kiến đến, trạng thái. | • Transporter account exists and is `ACTIVE`.<br>• At least one inbound with `deliveryMode = WAREHOUSE_TRANSPORT` is assigned to this transporter.<br>• Inbound status is `APPROVED` or later. |
+| TC_WHTR_002 | Empty state when no trips are assigned | 1. Đăng nhập bằng tài khoản Tài xế kho mới tạo (chưa được gán chuyến).<br>2. Truy cập **Chuyến vận chuyển của tôi** (`/staff/my-deliveries`). | • Hiển thị: **"Chưa có chuyến nào được gán."**<br>• Không có dòng inbound nào. | • Transporter account exists and is `ACTIVE`.<br>• No inbound delivery record has `assignedDriverUserId` = this user. |
+| TC_WHTR_003 | Non-transporter cannot use assigned-to-me filter | 1. Đăng nhập bằng tài khoản Warehouse Staff.<br>2. Call API `GET /api/inbound-requests?assignedToMe=true` (via Swagger or network tab). | • System returns HTTP `403 Forbidden`.<br>• Error message: **"assignedToMe requires WH_TRANSPORTER"**. | • WH Staff account exists and is `ACTIVE`. |
+| TC_WHTR_004 | Transporter cannot see unassigned warehouse-transport trips | 1. Đăng nhập Tài xế kho A.<br>2. WH Admin gán inbound `WAREHOUSE_TRANSPORT` cho Tài xế B.<br>3. Tài xế A mở **Chuyến vận chuyển của tôi**. | • Inbound gán cho Tài xế B **không** xuất hiện trong danh sách của Tài xế A. | • Two transporter accounts exist in the same warehouse.<br>• One inbound is assigned only to Transporter B. |
 
 ---
 
@@ -1323,9 +1330,9 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHTR_005 | View inbound trip detail successfully | 1. Log in as Warehouse Transporter.<br>2. On `/staff/my-deliveries`, click an inbound code.<br>3. Review the detail page. | • Detail page opens at `/staff/my-deliveries/{inboundRequestId}`.<br>• System shows inbound code, status, expected arrival date, SKU line items, and delivery section.<br>• Delivery info reflects data saved by WH Admin or transporter. | • Trip is assigned to the logged-in transporter.<br>• Inbound `deliveryMode = WAREHOUSE_TRANSPORT`. |
-| TC_WHTR_006 | Access denied for trip not assigned to transporter | 1. Log in as Warehouse Transporter A.<br>2. Manually navigate to `/staff/my-deliveries/{inboundRequestId}` of a trip assigned to Transporter B. | • System returns HTTP `403 Forbidden` or shows access denied on UI.<br>• Error message: **"Trip is not assigned to you"**. | • Inbound exists and is assigned to another transporter. |
-| TC_WHTR_007 | Transporter cannot open tenant-self inbound trip | 1. Tenant creates inbound with `deliveryMode = TENANT_SELF`.<br>2. Log in as Warehouse Transporter.<br>3. Attempt to open that inbound detail URL directly. | • Trip does not appear in assigned list.<br>• Direct API access returns error: **"This inbound is not warehouse transport"** (if delivery record exists). | • Inbound `deliveryMode = TENANT_SELF`.<br>• Inbound is not assigned to transporter. |
+| TC_WHTR_005 | View inbound trip detail successfully | 1. Đăng nhập Tài xế kho.<br>2. Trên **Chuyến vận chuyển của tôi**, chọn mã inbound.<br>3. Xem trang chi tiết chuyến. | • Trang mở tại `/staff/my-deliveries/{inboundRequestId}`.<br>• Hiển thị mã inbound, trạng thái, ngày dự kiến, SKU, mục vận chuyển.<br>• Thông tin vận chuyển phản ánh dữ liệu WH Admin/tài xế đã lưu. | • Trip is assigned to the logged-in transporter.<br>• Inbound `deliveryMode = WAREHOUSE_TRANSPORT`. |
+| TC_WHTR_006 | Access denied for trip not assigned to transporter | 1. Đăng nhập Tài xế kho A.<br>2. Truy cập trực tiếp URL `/staff/my-deliveries/{inboundRequestId}` của chuyến gán cho Tài xế B. | • HTTP `403 Forbidden` hoặc UI từ chối truy cập.<br>• **"Trip is not assigned to you"**. | • Inbound exists and is assigned to another transporter. |
+| TC_WHTR_007 | Transporter cannot open tenant-self inbound trip | 1. Tenant tạo inbound loại **Tự giao** (`TENANT_SELF`).<br>2. Đăng nhập Tài xế kho.<br>3. Thử mở URL chi tiết inbound đó trực tiếp. | • Chuyến không xuất hiện trong danh sách.<br>• API trả lỗi: **"This inbound is not warehouse transport"** (nếu có delivery record). | • Inbound `deliveryMode = TENANT_SELF`.<br>• Inbound is not assigned to transporter. |
 
 ---
 
@@ -1333,11 +1340,11 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHTR_008 | Update vehicle and driver info successfully | 1. Log in as assigned Warehouse Transporter.<br>2. Open assigned trip detail (status `APPROVED`).<br>3. Enter vehicle plate, driver name, driver phone, carrier name.<br>4. Click **Save vehicle info**. | • System shows success message: **"Delivery information saved successfully."** (or equivalent).<br>• Vehicle plate, driver name, phone, and carrier are persisted.<br>• Inbound status remains `APPROVED`. | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`. |
-| TC_WHTR_009 | Save fails when vehicle plate is empty | 1. Log in as assigned Transporter.<br>2. Open trip detail (status `APPROVED`).<br>3. Clear vehicle plate field.<br>4. Click **Save vehicle info**. | • System shows validation error: **"Vehicle plate is required."**<br>• Delivery record is not updated. | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`. |
-| TC_WHTR_010 | Transporter cannot reassign driver to another user | 1. Log in as assigned Transporter.<br>2. Call `PUT /api/inbound-requests/{id}/delivery` with body `{ "assignedDriverUserId": "<other-user-uuid>" }`. | • System returns HTTP `403 Forbidden`.<br>• Error message: **"Transporter cannot reassign driver"**. | • Trip assigned to logged-in transporter. |
-| TC_WHTR_011 | Update blocked when inbound status is not APPROVED | 1. Log in as assigned Transporter.<br>2. Open trip already in status `ARRIVED` or `RECEIVING`.<br>3. Attempt to edit and save vehicle info. | • System returns HTTP `400 Bad Request`.<br>• Error message indicates invalid inbound status for delivery update.<br>• Delivery fields are not changed. | • Trip was previously reported as arrived (#66). |
-| TC_WHTR_012 | Inactive transporter cannot be assigned (WH Admin side) | 1. WH Admin sets transporter status to `INACTIVE`.<br>2. WH Admin tries to assign that user on inbound delivery form. | • System returns HTTP `400 Bad Request`.<br>• Error message: **"Transporter account is not active"**. | • Transporter user exists with status `INACTIVE`. |
+| TC_WHTR_008 | Update vehicle and driver info successfully | 1. Đăng nhập Tài xế kho đã được gán chuyến.<br>2. Mở chi tiết chuyến (status `APPROVED`).<br>3. Nhập **Biển số xe**, tên/SĐT tài xế, hãng vận chuyển.<br>4. Bấm **Lưu thông tin xe**. | • Thông báo: **"Đã lưu thông tin vận chuyển"**.<br>• Thông tin xe được lưu.<br>• Inbound status vẫn `APPROVED`. | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`. |
+| TC_WHTR_009 | Save fails when vehicle plate is empty | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Mở chi tiết chuyến (`APPROVED`).<br>3. Xóa trường **Biển số xe**.<br>4. Bấm **Lưu thông tin xe**. | • Thông báo lỗi: **"Nhập biển số xe trước khi lưu"** (hoặc tương đương).<br>• Delivery record is not updated. | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`. |
+| TC_WHTR_010 | Transporter cannot reassign driver to another user | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Gọi API `PUT /api/inbound-requests/{id}/delivery` với `{ "assignedDriverUserId": "<other-user-uuid>" }`. | • HTTP `403 Forbidden`.<br>• **"Transporter cannot reassign driver"**. | • Trip assigned to logged-in transporter. |
+| TC_WHTR_011 | Update blocked when inbound status is not APPROVED | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Mở chi tiết chuyến đã ở trạng thái `ARRIVED` hoặc `RECEIVING`.<br>3. Thử sửa và bấm **Lưu thông tin xe**. | • HTTP `400 Bad Request`.<br>• Lỗi trạng thái inbound không hợp lệ.<br>• Thông tin vận chuyển không đổi. | • Trip was previously reported as arrived (#66). |
+| TC_WHTR_012 | Inactive transporter cannot be assigned (WH Admin side) | 1. System Admin **Vô hiệu hóa** tài xế trên **Quản lý tài khoản**.<br>2. WH Admin mở chi tiết inbound → mục vận chuyển → thử gán tài xế đó. | • HTTP `400 Bad Request`.<br>• **"Transporter account is not active"**. | • Transporter user exists with status `INACTIVE`. |
 
 ---
 
@@ -1345,11 +1352,11 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHTR_013 | Report arrival at warehouse successfully | 1. Log in as assigned Transporter.<br>2. Open trip detail (status `APPROVED`).<br>3. Ensure vehicle plate is saved (#65).<br>4. Click **Report arrival at warehouse**. | • System shows success message: **"Arrival reported successfully."** (or equivalent).<br>• Inbound status changes from `APPROVED` to `ARRIVED`.<br>• `actualArrivalAt` timestamp is recorded.<br>• WH Staff can continue receiving (#49). | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`.<br>• Vehicle plate is saved on delivery record. |
-| TC_WHTR_014 | Report arrival fails without vehicle plate | 1. Log in as assigned Transporter.<br>2. Open trip detail (status `APPROVED`) with no vehicle plate saved.<br>3. Click **Report arrival at warehouse**. | • System returns HTTP `400 Bad Request`.<br>• Error message: **"Vehicle plate is required before marking arrival. Save inbound delivery info first."**<br>• Inbound status remains `APPROVED`. | • Trip assigned to logged-in transporter.<br>• Delivery record has no `vehiclePlate`. |
-| TC_WHTR_015 | Report arrival fails when status is not APPROVED | 1. Log in as assigned Transporter.<br>2. Open trip already in status `ARRIVED`.<br>3. Call `POST /api/inbound-requests/{id}/report-arrival` again. | • System returns HTTP `400 Bad Request`.<br>• Error message indicates invalid status transition.<br>• Status stays `ARRIVED`. | • Arrival was already reported once. |
-| TC_WHTR_016 | Warehouse Staff cannot use report-arrival endpoint | 1. Log in as Warehouse Staff.<br>2. Call `POST /api/inbound-requests/{id}/report-arrival` for a TENANT_SELF inbound. | • System returns HTTP `403 Forbidden`.<br>• Error message: **"WH_TRANSPORTER only"**. | • WH Staff account is `ACTIVE`.<br>• Valid inbound exists. |
-| TC_WHTR_017 | Unassigned transporter cannot report arrival | 1. Log in as Transporter A.<br>2. Call report-arrival API for inbound assigned to Transporter B. | • System returns HTTP `403 Forbidden`.<br>• Error message: **"Trip is not assigned to you"**. | • Inbound assigned to a different transporter. |
+| TC_WHTR_013 | Report arrival at warehouse successfully | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Mở chi tiết chuyến (`APPROVED`), đã lưu biển số (#65).<br>3. Bấm **Báo đã đến kho**. | • Thông báo thành công.<br>• Inbound status: `APPROVED` → `ARRIVED`.<br>• `actualArrivalAt` được ghi nhận.<br>• WH Staff tiếp tục nhận hàng (#49). | • Trip assigned to logged-in transporter.<br>• Inbound status = `APPROVED`.<br>• Vehicle plate is saved on delivery record. |
+| TC_WHTR_014 | Report arrival fails without vehicle plate | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Mở chi tiết chuyến chưa có biển số.<br>3. Bấm **Báo đã đến kho**. | • HTTP `400 Bad Request`.<br>• Thông báo: cần lưu biển số trước khi báo đến kho.<br>• Inbound status vẫn `APPROVED`. | • Trip assigned to logged-in transporter.<br>• Delivery record has no `vehiclePlate`. |
+| TC_WHTR_015 | Report arrival fails when status is not APPROVED | 1. Đăng nhập Tài xế kho được gán chuyến.<br>2. Mở chi tiết chuyến đã ở trạng thái `ARRIVED`.<br>3. Gọi lại API `POST /api/inbound-requests/{id}/report-arrival`. | • HTTP `400 Bad Request`.<br>• Lỗi chuyển trạng thái không hợp lệ.<br>• Trạng thái vẫn `ARRIVED`. | • Arrival was already reported once. |
+| TC_WHTR_016 | Warehouse Staff cannot use report-arrival endpoint | 1. Đăng nhập bằng tài khoản Warehouse Staff.<br>2. Call `POST /api/inbound-requests/{id}/report-arrival` for a TENANT_SELF inbound. | • System returns HTTP `403 Forbidden`.<br>• Error message: **"WH_TRANSPORTER only"**. | • WH Staff account is `ACTIVE`.<br>• Valid inbound exists. |
+| TC_WHTR_017 | Unassigned transporter cannot report arrival | 1. Đăng nhập bằng tài khoản Transporter A.<br>2. Call report-arrival API for inbound assigned to Transporter B. | • System returns HTTP `403 Forbidden`.<br>• Error message: **"Trip is not assigned to you"**. | • Inbound assigned to a different transporter. |
 
 ---
 
@@ -1357,8 +1364,8 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_WHTR_018 | Transporter login redirects to my deliveries | 1. Open `/login`.<br>2. Enter valid transporter credentials.<br>3. Submit login form. | • Login succeeds.<br>• System redirects to `/staff/my-deliveries`.<br>• Sidebar shows **My Deliveries** (or equivalent) as primary navigation. | • Transporter account exists and is `ACTIVE`. |
-| TC_WHTR_019 | Transporter cannot access admin pages | 1. Log in as Warehouse Transporter.<br>2. Manually navigate to `/admin/inbound` or `/admin/accounts`. | • System redirects to login or shows **403 / Access denied**.<br>• Admin pages are not accessible. | • Transporter account is `ACTIVE`. |
+| TC_WHTR_018 | Transporter login redirects to my deliveries | 1. Truy cập trang **Đăng nhập** (`/login`).<br>2. Nhập email/mật khẩu Tài xế kho.<br>3. Bấm đăng nhập. | • Đăng nhập thành công.<br>• Chuyển tới `/staff/my-deliveries`.<br>• Sidebar hiển thị **Chuyến vận chuyển của tôi**. | • Transporter account exists and is `ACTIVE`. |
+| TC_WHTR_019 | Transporter cannot access admin pages | 1. Đăng nhập Tài xế kho.<br>2. Truy cập trực tiếp `/admin/inbound` hoặc `/admin/accounts`. | • Chuyển về đăng nhập hoặc hiển thị **403 / Access denied**.<br>• Không truy cập được trang admin. | • Transporter account is `ACTIVE`. |
 
 ---
 
@@ -1391,11 +1398,11 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_Inactive_User_001 | Deactivate active user successfully | 1. Log in as System Admin.<br>2. Navigate to `/admin/accounts`.<br>3. Locate an **ACTIVE** user (not yourself).<br>4. Click the **Deactivate** icon (`person_off`).<br>5. Confirm in the dialog. | • System shows success message: **"Account deactivated successfully."** (or equivalent: *"Đã vô hiệu hóa tài khoản {name}."*).<br>• User status badge changes to **Inactive** / `INACTIVE`.<br>• **Active users** count decreases by 1. | • System Admin account is `ACTIVE`.<br>• Target user exists with status `ACTIVE`.<br>• Target user is not the logged-in admin. |
-| TC_Inactive_User_002 | Deactivated user cannot log in | 1. Complete TC_Inactive_User_001.<br>2. Log out System Admin.<br>3. Attempt to log in with the deactivated user's email and password. | • Login fails with HTTP `403 Forbidden`.<br>• Error message: **"Account is not active"** (`ACCOUNT_INACTIVE`).<br>• No access token is issued. | • Target user status = `INACTIVE` after step 001. |
-| TC_Inactive_User_003 | Admin cannot deactivate own account | 1. Log in as System Admin.<br>2. On `/admin/accounts`, find your own row.<br>3. Attempt to click Deactivate (if shown) or call `PATCH /api/users/{ownId}` with `{ "status": "INACTIVE" }`. | • UI: warning dialog **"You cannot deactivate your own account."** (or deactivate button hidden for own row).<br>• API: HTTP `403 Forbidden` — **"Cannot deactivate your own account"**.<br>• Admin status remains `ACTIVE`. | • System Admin is logged in. |
-| TC_Inactive_User_004 | Non–System Admin cannot deactivate users | 1. Log in as Warehouse Admin or Tenant Admin.<br>2. Open `/admin/accounts` or `/staff/accounts`.<br>3. Observe action buttons on user rows. | • Deactivate/Activate toggle icon is **not displayed** (System Admin only on FE).<br>• If API called directly for out-of-scope user: HTTP `404` — **"User not found"**. | • WH Admin or Tenant Admin account is `ACTIVE`. |
-| TC_Inactive_User_005 | Deactivate non-existent user returns error | 1. Log in as System Admin.<br>2. Call `PATCH /api/users/00000000-0000-4000-8000-000000000099` with `{ "status": "INACTIVE" }`. | • HTTP `404 Not Found`.<br>• Error message: **"User not found"**.<br>• No user record is modified. | • Invalid or non-existent `userId`. |
+| TC_Inactive_User_001 | Deactivate active user successfully | 1. Đăng nhập System Admin.<br>2. Truy cập **Quản lý tài khoản** (`/admin/accounts`).<br>3. Tìm user đang **Đang hoạt động** (không phải chính mình).<br>4. Chọn icon **Vô hiệu hóa** (`person_off`).<br>5. Xác nhận hộp thoại **Vô hiệu hóa tài khoản**. | • Thông báo: **"Đã vô hiệu hóa tài khoản {name}."**<br>• Badge trạng thái → **Vô hiệu hóa** / `INACTIVE`.<br>• Số **Đang hoạt động** giảm 1. | • System Admin account is `ACTIVE`.<br>• Target user exists with status `ACTIVE`.<br>• Target user is not the logged-in admin. |
+| TC_Inactive_User_002 | Deactivated user cannot log in | 1. Hoàn thành TC_Inactive_User_001.<br>2. **Đăng xuất** System Admin.<br>3. Thử **Đăng nhập** bằng email/mật khẩu user đã bị vô hiệu hóa. | • Đăng nhập thất bại, HTTP `403 Forbidden`.<br>• Thông báo: **"Account is not active"** (`ACCOUNT_INACTIVE`).<br>• Không cấp access token. | • Target user status = `INACTIVE` after step 001. |
+| TC_Inactive_User_003 | Admin cannot deactivate own account | 1. Đăng nhập System Admin.<br>2. Trên **Quản lý tài khoản**, tìm dòng của chính mình.<br>3. Thử chọn **Vô hiệu hóa** hoặc gọi API `PATCH` status `INACTIVE`. | • FE: cảnh báo **"Bạn không thể tự vô hiệu hóa tài khoản của chính mình."** (hoặc ẩn nút).<br>• API: HTTP `403` — **"Cannot deactivate your own account"**.<br>• Admin vẫn `ACTIVE`. | • System Admin is logged in. |
+| TC_Inactive_User_004 | Non–System Admin cannot deactivate users | 1. Đăng nhập WH Admin hoặc Tenant Admin.<br>2. Truy cập **Quản lý tài khoản** (`/admin/accounts` hoặc `/staff/accounts`).<br>3. Quan sát các nút thao tác trên từng dòng user. | • Icon **Vô hiệu hóa** / **Kích hoạt** **không hiển thị** (chỉ System Admin).<br>• Gọi API trực tiếp ngoài phạm vi: HTTP `404` — **"User not found"**. | • WH Admin or Tenant Admin account is `ACTIVE`. |
+| TC_Inactive_User_005 | Deactivate non-existent user returns error | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Call `PATCH /api/users/00000000-0000-4000-8000-000000000099` with `{ "status": "INACTIVE" }`. | • HTTP `404 Not Found`.<br>• Error message: **"User not found"**.<br>• No user record is modified. | • Invalid or non-existent `userId`. |
 
 ---
 
@@ -1403,11 +1410,11 @@ POST /api/inbound-requests/{id}/report-arrival
 
 | Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
 |--------------|----------------------|---------------------|------------------|----------------|
-| TC_Active_User_001 | Reactivate inactive user successfully | 1. Log in as System Admin.<br>2. Navigate to `/admin/accounts`.<br>3. Filter or locate a user with status **Inactive** (`INACTIVE`).<br>4. Click the **Activate** icon (`how_to_reg`).<br>5. Confirm in the dialog. | • System shows success message: **"Account activated successfully."** (or equivalent: *"Đã kích hoạt tài khoản {name}."*).<br>• User status badge changes to **Active** / `ACTIVE`.<br>• **Active users** count increases by 1. | • Target user exists with status `INACTIVE`.<br>• System Admin is logged in. |
-| TC_Active_User_002 | Reactivated user can log in successfully | 1. Complete TC_Active_User_001.<br>2. Log out System Admin.<br>3. Log in with the reactivated user's email and password. | • Login succeeds.<br>• User is redirected to the home page for their role.<br>• Valid `accessToken` is returned. | • Target user status = `ACTIVE` after step 001. |
-| TC_Active_User_003 | Reactivate non-existent user returns error | 1. Log in as System Admin.<br>2. Call `PATCH /api/users/00000000-0000-4000-8000-000000000099` with `{ "status": "ACTIVE" }`. | • HTTP `404 Not Found`.<br>• Error message: **"User not found"**. | • Invalid or non-existent `userId`. |
-| TC_Active_User_004 | WH Admin cannot reactivate BLOCKED user | 1. Ensure a user has status `BLOCKED` (set via DB or System Admin if supported).<br>2. Log in as Warehouse Admin.<br>3. Attempt `PATCH /api/users/{blockedUserId}` with `{ "status": "ACTIVE" }` for a user in WH Admin scope. | • HTTP `403 Forbidden`.<br>• Error message: **"Cannot reactivate blocked user"**.<br>• User status remains `BLOCKED`. | • User exists with status `BLOCKED`.<br>• WH Admin has scope over that user. |
-| TC_Active_User_005 | Inactive transporter cannot be assigned after deactivation | 1. Deactivate a WH_TRANSPORTER user (TC_Inactive_User_001).<br>2. Log in as WH Admin.<br>3. Open inbound delivery form and try to assign that transporter. | • HTTP `400 Bad Request`.<br>• Error message: **"Transporter account is not active"**.<br>• Transporter is not saved on delivery record. | • Transporter was `ACTIVE` then set to `INACTIVE`.<br>• WAREHOUSE_TRANSPORT inbound exists. |
+| TC_Active_User_001 | Reactivate inactive user successfully | 1. Đăng nhập System Admin.<br>2. Truy cập **Quản lý tài khoản**.<br>3. Tìm user **Vô hiệu hóa** (`INACTIVE`).<br>4. Chọn icon **Kích hoạt** (`how_to_reg`).<br>5. Xác nhận hộp thoại **Kích hoạt tài khoản**. | • Thông báo: **"Đã kích hoạt tài khoản {name}."**<br>• Badge → **Đang hoạt động** / `ACTIVE`. | • Target user exists with status `INACTIVE`.<br>• System Admin is logged in. |
+| TC_Active_User_002 | Reactivated user can log in successfully | 1. Hoàn thành TC_Active_User_001.<br>2. **Đăng xuất** System Admin.<br>3. **Đăng nhập** bằng email/mật khẩu user vừa được kích hoạt. | • Đăng nhập thành công.<br>• Chuyển tới trang chủ theo role.<br>• Nhận `accessToken` hợp lệ. | • Target user status = `ACTIVE` after step 001. |
+| TC_Active_User_003 | Reactivate non-existent user returns error | 1. Đăng nhập bằng tài khoản System Admin.<br>2. Call `PATCH /api/users/00000000-0000-4000-8000-000000000099` with `{ "status": "ACTIVE" }`. | • HTTP `404 Not Found`.<br>• Error message: **"User not found"**. | • Invalid or non-existent `userId`. |
+| TC_Active_User_004 | WH Admin cannot reactivate BLOCKED user | 1. Ensure a user has status `BLOCKED` (set via DB or System Admin if supported).<br>2. Đăng nhập bằng tài khoản Warehouse Admin.<br>3. Attempt `PATCH /api/users/{blockedUserId}` with `{ "status": "ACTIVE" }` for a user in WH Admin scope. | • HTTP `403 Forbidden`.<br>• Error message: **"Cannot reactivate blocked user"**.<br>• User status remains `BLOCKED`. | • User exists with status `BLOCKED`.<br>• WH Admin has scope over that user. |
+| TC_Active_User_005 | Inactive transporter cannot be assigned after deactivation | 1. Vô hiệu hóa tài xế kho (TC_Inactive_User_001).<br>2. Đăng nhập WH Admin.<br>3. Mở chi tiết inbound → mục vận chuyển → thử gán tài xế đó. | • HTTP `400 Bad Request`.<br>• **"Transporter account is not active"**.<br>• Tài xế không được lưu trên delivery record. | • Transporter was `ACTIVE` then set to `INACTIVE`.<br>• WAREHOUSE_TRANSPORT inbound exists. |
 
 ---
 
