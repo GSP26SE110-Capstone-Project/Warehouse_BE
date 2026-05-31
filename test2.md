@@ -1,6 +1,6 @@
-# Hướng dẫn thực hiện từng Function (Manual Test Guide)
+  # Hướng dẫn thực hiện từng Function (Manual Test Guide)
 
-> **Mục đích**: Hướng dẫn từng bước làm / test 69 function trong `docs/all_role_func.md`.
+> **Mục đích**: Hướng dẫn từng bước làm / test 70 function trong `docs/all_role_func.md`.
 > **Phiên bản**: 1.1 — 2026-05-30.
 > **Tham chiếu**: `docs/all_role_func.md`, `docs/request.md`, Swagger `http://localhost:3000/api-docs`.
 
@@ -35,7 +35,9 @@ Seed admin lần đầu: `npm run seed:admin` (trong BE).
 
 ### 3. Đăng nhập & lấy token
 
-**FE**: Vào `/login` → nhập email/password → hệ thống tự lưu token.
+Chi tiết từng bước FE/API: xem **#70 Login** bên dưới. Tóm tắt:
+
+**FE**: `/login` → nhập **Email** / **Mật khẩu** → **Đăng nhập** → token lưu localStorage.
 
 **API / Swagger**:
 
@@ -996,7 +998,42 @@ POST /api/inbound-requests/{id}/report-arrival
 
 ---
 
-# AUTHENTICATION — PASSWORD & OTP (67–69)
+# AUTHENTICATION — LOGIN, PASSWORD & OTP (Login, 67–69)
+
+---
+
+### #70 Login ✅
+
+| | |
+|---|---|
+| **Role** | Tất cả role (`ACTIVE`) — Guest trước khi đăng nhập |
+| **Login** | Không cần (đây là bước đăng nhập) |
+
+**Điều kiện**: Tài khoản `ACTIVE`, email và mật khẩu đúng.
+
+**FE**:
+1. Navigate `/login` (hoặc từ **← Về trang chủ** / nút login trên Landing)
+2. Nhập **Email** và **Mật khẩu**
+3. Click **Đăng nhập** (loading: **Đang xác thực...**)
+4. Hệ thống redirect theo role (xem bảng dưới)
+
+| Role | Email test | Redirect sau login |
+|------|------------|-------------------|
+| System Admin | `admin@warehouse.local` | `/admin/requests` |
+| Warehouse Admin | `whadmin@warehouse.local` | `/admin/dashboard` |
+| Tenant Admin | `tenant1admin@brand.local` | `/staff/products` |
+| WH Staff / Tenant Staff | Tạo bởi admin | `/staff/dashboard` |
+| WH Transporter | Tạo bởi WH Admin (#18) | `/staff/my-deliveries` |
+
+**API**:
+```http
+POST /api/auth/login
+{ "email": "admin@warehouse.local", "password": "admin12345" }
+```
+
+**Kết quả**: `accessToken` + `user` (role, tenantId, warehouseId) · FE lưu session · Swagger copy Bearer token.
+
+**Liên kết**: **Quên mật khẩu?** → #67 · User `INACTIVE` không login được (xem **Inactive User** test cases).
 
 ---
 
@@ -1092,7 +1129,7 @@ Authorization: Bearer <accessToken>
 
 | Lỗi | Nguyên nhân | Cách xử lý |
 |-----|-------------|------------|
-| `403 Forbidden` | Sai role / sai scope | Login đúng account, check JWT role |
+| `INVALID_CREDENTIALS` | Sai email/mật khẩu | Kiểm tra account test #70 |
 | `Contract must be ACTIVE` | Hợp đồng chưa active | WH Admin PATCH contract #31 |
 | `INSUFFICIENT_INVENTORY` | Xuất quá tồn | Nhập inbound trước (#43→#51) |
 | `Trip is not assigned to you` | Transporter chưa được gán | WH Admin làm #29 |
@@ -1109,8 +1146,8 @@ Authorization: Bearer <accessToken>
 
 # Test Case Specification (English) — All Roles
 
-> **Reference**: `docs/all_role_func.md` (#1–#69)  
-> **Version**: 1.2 — 2026-05-30  
+> **Reference**: `docs/all_role_func.md` (#1–#70)  
+> **Version**: 1.3 — 2026-05-30  
 > **Test environment**: FE `http://localhost:5173` · BE `http://localhost:3000` · Swagger `http://localhost:3000/api-docs`
 
 ### Global test accounts
@@ -1498,7 +1535,26 @@ Authorization: Bearer <accessToken>
 
 ---
 
-# Authentication — Test Cases (#67–#69)
+# Authentication — Test Cases (Login #70, #67–#69)
+
+## **Login** (#70)
+
+> **Role**: All roles — unauthenticated guest
+
+| Test Case ID | Test Case Description | Test Case Procedure | Expected Results | Pre-conditions |
+|--------------|----------------------|---------------------|------------------|----------------|
+| TC_LOGIN_001 | System Admin login successfully | 1. Navigate to `/login`.<br>2. Enter **Email** `admin@warehouse.local` and **Mật khẩu** `admin12345`.<br>3. Click **Đăng nhập**. | • Login succeeds; loading **Đang xác thực...** then redirect.<br>• Redirect to `/admin/requests`.<br>• `accessToken` stored; admin sidebar/menu visible. | • System Admin account is `ACTIVE`. |
+| TC_LOGIN_002 | Warehouse Admin login successfully | 1. Navigate to `/login`.<br>2. Enter **Email** `whadmin@warehouse.local` and **Mật khẩu** `WhAdmin@12345`.<br>3. Click **Đăng nhập**. | • Login succeeds.<br>• Redirect to `/admin/dashboard`.<br>• WH Admin can access warehouse-scoped `/admin/*` pages. | • WH Admin account is `ACTIVE`. |
+| TC_LOGIN_003 | Tenant Admin login successfully | 1. Navigate to `/login`.<br>2. Enter **Email** `tenant1admin@brand.local` and **Mật khẩu** `Tenant1@12345`.<br>3. Click **Đăng nhập**. | • Login succeeds.<br>• Redirect to `/staff/products`.<br>• Tenant Admin can access `/staff/*` for their tenant. | • Tenant Admin account is `ACTIVE`. |
+| TC_LOGIN_004 | Transporter login redirects to my deliveries | 1. Navigate to `/login`.<br>2. Enter Warehouse Transporter **Email** and **Mật khẩu**.<br>3. Click **Đăng nhập**. | • Login succeeds.<br>• Redirect to `/staff/my-deliveries`.<br>• Sidebar shows transporter menu (not WH Admin pages). | • Transporter account exists and is `ACTIVE`. |
+| TC_LOGIN_005 | Login fails — invalid email or password | 1. Navigate to `/login`.<br>2. Enter a registered **Email** with wrong **Mật khẩu** (or unknown email).<br>3. Click **Đăng nhập**. | • HTTP `401 Unauthorized`, code `INVALID_CREDENTIALS`.<br>• FE alert title **Đăng nhập thất bại**; message **"Email hoặc mật khẩu không đúng"**.<br>• No `accessToken` is stored. | • Guest (not logged in). |
+| TC_LOGIN_006 | Login fails — inactive account | 1. Ensure target user status is `INACTIVE` (see TC_Inactive_User_001).<br>2. Navigate to `/login`.<br>3. Enter that user's **Email** and **Mật khẩu**.<br>4. Click **Đăng nhập**. | • HTTP `403 Forbidden`, code `ACCOUNT_INACTIVE`.<br>• Message: **"Account is not active"** (FE: **"Tài khoản chưa được kích hoạt"**).<br>• No `accessToken` is issued. | • Target user status = `INACTIVE`. |
+| TC_LOGIN_007 | Login fails — missing email or password (API) | 1. Call `POST /api/auth/login` via Swagger with `{}` or missing `password`. | • HTTP `400 Bad Request`, code `VALIDATION_ERROR`.<br>• Message: **"email and password are required"**. | • None. |
+| TC_LOGIN_008 | Already authenticated user skips login page | 1. Log in as System Admin.<br>2. Navigate to `/login` manually. | • User is redirected to `/admin/requests` (role home).<br>• Login form is not shown while session is valid. | • Valid session / `accessToken` exists. |
+| TC_LOGIN_009 | Protected route requires login | 1. Log out (or clear session).<br>2. Navigate directly to `/admin/warehouse`. | • Redirect to `/login`.<br>• After successful login, user can access the intended page (if role allows). | • No valid `accessToken`. |
+| TC_LOGIN_010 | Login via API returns token and user | 1. Call `POST /api/auth/login` with valid `email` and `password` for System Admin. | • HTTP `200`.<br>• Response includes `accessToken` and `user` (`role`, `email`, `status`). | • System Admin account is `ACTIVE`. |
+
+---
 
 ## **Forgot Password** (#67)
 
@@ -1557,8 +1613,9 @@ Authorization: Bearer <accessToken>
 | Warehouse Transporter | `TC_WHTR_` | 20 | #63–#66 |
 | **Inactive User** | `TC_Inactive_User_` | 5 | Deactivate account |
 | **Active User** | `TC_Active_User_` | 5 | Reactivate account |
+| **Login** | `TC_LOGIN_` | 10 | #70 Login (all roles) |
 | **Authentication** | `TC_AUTH_` | 16 | #67–#69 Forgot / Change / Verify OTP |
 | End-to-end | `TC_E2E_` / `TC_*_E2E_` | 4 | Cross-role + auth flows |
-| **Total** | | **144** | **#1–#69 + warehouse CRUD + account status** |
+| **Total** | | **154** | **#1–#70 + warehouse CRUD + account status** |
 
 > Cases marked **Not yet implemented** cover invoice (#10, #24, #46, #62), damage (#54), partial outbound UI, and **forgot-password email API** (#67 FE submit) — update when ready.
